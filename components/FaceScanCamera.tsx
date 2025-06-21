@@ -13,19 +13,25 @@ import {
 import type { CameraView as ExpoCameraView } from "expo-camera";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Toast from "react-native-toast-message";
+import { FaceVerifyImage } from "@/service/face-verify/face-verify.api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface FaceScanCameraProps {
   onClose: () => void;
-  onScanComplete: (base64Image: string) => void;
+  onVerificationSuccess: (studentId: number) => void;
   studentName?: string;
+  studentId: number;
+  scheduleId: number;
 }
 
 const { width, height } = Dimensions.get("window");
 
 export default function FaceScanCamera({
   onClose,
-  onScanComplete,
+  onVerificationSuccess,
   studentName,
+  studentId,
+  scheduleId,
 }: FaceScanCameraProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
@@ -38,42 +44,41 @@ export default function FaceScanCamera({
   }, [permission]);
 
   const handleScan = async () => {
-    if (isScanning) return;
+    if (isScanning || !cameraRef.current) return;
+    
     setIsScanning(true);
+    Toast.show({
+      type: 'info',
+      text1: 'Đang xử lý ảnh...',
+    });
 
-    if (Platform.OS !== "web" && cameraRef.current) {
-      try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.7,
-          base64: true,
-          exif: false,
-        });
-        if (photo?.base64) {
-          onScanComplete(photo.base64);
-        } else {
-          Toast.show({
-            type:'error',
-            text1:'không thể lấy dữ liệu ảnh'
-          });
-          setIsScanning(false);
-        }
-      } catch (error) {
-        console.error("Lỗi chụp ảnh:", error);
-        Toast.show({
-          type:'error',
-          text1:'không thể xác thực khuôn mặt'
-        });
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.7,
+        base64: true,
+        exif: false,
+      });
+
+      if (!photo?.base64) {
+        Toast.show({ type:'error', text1:'Không thể lấy dữ liệu ảnh' });
+        setIsScanning(false);
+        return;
+      }
+
+      const token = await AsyncStorage.getItem("access_token") || "";
+      const result = await FaceVerifyImage(studentId, scheduleId, photo.base64, token);
+
+      if (result) {
+        onVerificationSuccess(studentId);
+        onClose(); // Close camera on success
+      } else {
+        // Error toast is shown by the API service, just reset scanning state
         setIsScanning(false);
       }
-    } else {
-      // Logic mô phỏng cho web
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        onScanComplete("fake_base64_string_for_web_testing");
-      } catch (error) {
-        Alert.alert("Lỗi", "Không thể quét khuôn mặt (mô phỏng).");
-        setIsScanning(false);
-      }
+    } catch (error) {
+      console.error("Lỗi chụp ảnh hoặc xác thực:", error);
+      Toast.show({ type:'error', text1:'Không thể xác thực khuôn mặt' });
+      setIsScanning(false);
     }
   };
 

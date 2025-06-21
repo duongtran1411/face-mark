@@ -24,7 +24,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Schedule } from '@/models/Schedule';
 import { getScheduleById } from '@/service/schedule/schedule.api';
 import FaceScanCamera from '@/components/FaceScanCamera';
-import { FaceVerifyImage } from '@/service/face-verify/face-verify.api';
 import Toast from 'react-native-toast-message';
 
 // Student type now directly uses the Student model
@@ -43,47 +42,14 @@ export default function ClassDetailScreen() {
   const [isFaceScanCameraVisible, setIsFaceScanCameraVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-  const handleVerification = async (base64Image: string) => {
-    if (!selectedStudent || !scheduleId) {
-      Alert.alert("Lỗi", "Thiếu thông tin sinh viên hoặc lịch học để xác thực.");
-      setIsFaceScanCameraVisible(false);
-      setSelectedStudent(null);
-      return;
-    }
-
-    setIsFaceScanCameraVisible(false);
-    
+  const handleVerificationSuccess = (verifiedStudentId: number) => {
     Toast.show({
-      type: 'info',
-      text1: 'Đang xác thực...',
-      text2: `Vui lòng chờ trong khi hệ thống xử lý ảnh.`,
-      visibilityTime: 4000,
+      type: 'success',
+      text1: 'Xác thực thành công!',
+      text2: `Đã điểm danh sinh viên.`,
     });
-
-    try {
-      const token = await AsyncStorage.getItem("access_token") || "";
-      
-      const result = await FaceVerifyImage(
-        selectedStudent.id,
-        parseInt(scheduleId, 10),
-        base64Image,
-        token
-      );
-      
-      if (result) { 
-        Toast.show({
-          type: 'success',
-          text1: 'Xác thực thành công!',
-          text2: `${selectedStudent.name} đã được điểm danh.`
-        });
-        updateStatus(selectedStudent.id, 'Đang học');
-      }
-      
-    } catch (error) {
-      console.error("Lỗi API xác thực:", error);
-    } finally {
-      setSelectedStudent(null);
-    }
+    updateStatus(verifiedStudentId, 'Đang học');
+    setSelectedStudent(null);
   };
 
   useEffect(() => {
@@ -256,17 +222,24 @@ export default function ClassDetailScreen() {
       <Modal
         visible={isFaceScanCameraVisible}
         animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsFaceScanCameraVisible(false)}
+        transparent={false}
+        onRequestClose={() => {
+          setIsFaceScanCameraVisible(false);
+          setSelectedStudent(null);
+        }}
       >
-        <FaceScanCamera
-          onClose={() => {
-            setIsFaceScanCameraVisible(false);
-            setSelectedStudent(null);
-          }}
-          onScanComplete={handleVerification}
-          studentName={selectedStudent?.name}
-        />
+        {selectedStudent && scheduleId && (
+          <FaceScanCamera
+            onClose={() => {
+              setIsFaceScanCameraVisible(false);
+              setSelectedStudent(null);
+            }}
+            onVerificationSuccess={handleVerificationSuccess}
+            studentName={selectedStudent.name}
+            studentId={selectedStudent.id}
+            scheduleId={parseInt(scheduleId, 10)}
+          />
+        )}
       </Modal>
     </View>
   );
