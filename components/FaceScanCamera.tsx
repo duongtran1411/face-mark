@@ -1,17 +1,17 @@
-import React, { useState, useRef, useEffect } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Alert,
   Dimensions,
   Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
-import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
 import type { CameraView as ExpoCameraView } from "expo-camera";
+import { CameraView, useCameraPermissions } from "expo-camera";
 
 interface FaceScanCameraProps {
   onClose: () => void;
@@ -97,7 +97,8 @@ export default function FaceScanCamera({
             style={[
               styles.scanText,
               { marginTop: 10, backgroundColor: "rgba(90,90,90,0.7)" },
-            ]}>
+            ]}
+          >
             Camera không khả dụng - Đây là mô phỏng
           </Text>
         )}
@@ -107,7 +108,8 @@ export default function FaceScanCamera({
         <TouchableOpacity
           style={[styles.scanButton, isScanning && styles.scanButtonDisabled]}
           onPress={handleScan}
-          disabled={isScanning}>
+          disabled={isScanning}
+        >
           <Ionicons
             name={isScanning ? "scan" : "scan-circle-outline"}
             size={70}
@@ -145,14 +147,15 @@ export default function FaceScanCamera({
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, { marginTop: 10 }]}
-            onPress={onClose}>
+            onPress={onClose}
+          >
             <Text style={styles.buttonText}>Đóng</Text>
           </TouchableOpacity>
         </View>
       );
     }
     return (
-      <CameraView ref={cameraRef} style={styles.container} facing="front">
+      <CameraView ref={cameraRef} style={styles.container} facing="back">
         {renderOverlay()}
       </CameraView>
     );
