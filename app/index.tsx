@@ -8,7 +8,7 @@ export default function CheckAuthScreen(){
   useEffect(() => {
     const checkToken = async () => {
       try {
-        const token = await AsyncStorage.getItem("accesss_token");
+        const token = await AsyncStorage.getItem("access_token");
         if (token) {
           setLoading(false);
           router.replace("/(tabs)");

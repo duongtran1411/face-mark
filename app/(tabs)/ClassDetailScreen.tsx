@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   FlatList,
   Pressable,
   TouchableOpacity,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -14,54 +16,115 @@ import {
   Ionicons,
   Entypo,
 } from '@expo/vector-icons';
+import { Student } from '@/models/Student';
+import { getStudentByClass } from '@/service/student/student.api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Schedule } from '@/models/Schedule';
+import { getScheduleById } from '@/service/schedule/schedule.api';
+import FaceScanCamera from '@/components/FaceScanCamera';
 
-type Student = {
-  id: string;
-  name: string;
-  status: 'present' | 'late' | 'excused' | 'unexcused';
+// Student type now directly uses the Student model
+type StudentAttendance = {
+  student: Student;
+  status: 'Đang học' | 'late' | 'vắng mặt';
 };
 
 export default function ClassDetailScreen() {
   const router = useRouter();
-  const { className, subject, time, room, date } = useLocalSearchParams<{
-    className: string;
-    subject: string;
-    time: string;
-    room: string;
-    date: string;
-  }>();
+  const { scheduleId } = useLocalSearchParams<{ scheduleId: string }>();
 
-  const [students, setStudents] = useState<Student[]>([
-    { id: 'SV001', name: 'Nguyễn Văn An', status: 'present' },
-    { id: 'SV002', name: 'Trần Thị Bình', status: 'present' },
-    { id: 'SV003', name: 'Lê Văn Cường', status: 'late' },
-    { id: 'SV004', name: 'Phạm Thị Dung', status: 'excused' },
-    { id: 'SV005', name: 'Hoàng Thị Hà', status: 'unexcused' },
-    { id: 'SV006', name: 'Ngô Văn Minh', status: 'present' },
-    { id: 'SV007', name: 'Lê Thị Thu', status: 'present' },
-    { id: 'SV008', name: 'Trịnh Văn Nam', status: 'present' },
-  ]);
+  const [students, setStudents] = useState<StudentAttendance[]>([]);
+  const [scheduleInfo, setScheduleInfo] = useState<Schedule | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFaceScanCameraVisible, setIsFaceScanCameraVisible] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-  const updateStatus = (id: string, newStatus: Student['status']) => {
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!scheduleId) return;
+      setIsLoading(true);
+      try {
+        const token = await AsyncStorage.getItem("access_token") || "";
+        
+        // Fetch both schedule details and student list concurrently
+        const [scheduleData, studentData] = await Promise.all([
+          getScheduleById(parseInt(scheduleId, 10), token),
+          getStudentByClass(parseInt(scheduleId, 10), token)
+        ]);
+        
+        setScheduleInfo(scheduleData);
+
+        // Ensure studentData is an array and filter out invalid entries
+        if (Array.isArray(studentData)) {
+          console.log('studentData', studentData);
+          console.log('First item structure:', studentData[0]);
+          
+          const initialStudents: StudentAttendance[] = studentData
+            .filter((response: any) => {
+              console.log('Filtering item:', response);
+              return response?.student; // Check if student exists directly
+            })
+            .map((response: { student: Student; status?: string }) => {
+              console.log('Mapping item:', response);
+              return {
+                student: response.student,
+                status: 'Đang học', 
+              };
+            });
+          setStudents(initialStudents);
+          console.log('initialstudent', initialStudents);
+        } else {
+          console.error("API for students did not return an array.");
+          setStudents([]);
+        }
+
+      } catch (error) {
+        console.error("Failed to fetch class details:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [scheduleId]);
+
+  const updateStatus = (id: number, newStatus: StudentAttendance['status']) => {
     setStudents((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s))
+      prev.map((s) => (s.student.id === id ? { ...s, status: newStatus } : s))
     );
   };
 
-  const countByStatus = (status: Student['status']) =>
+  const countByStatus = (status: StudentAttendance['status']) =>
     students.filter((s) => s.status === status).length;
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#2E7D32" />
+        <Text>Đang tải dữ liệu lớp học...</Text>
+      </View>
+    );
+  }
+
+  if (!scheduleInfo) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Không thể tải thông tin lớp học.</Text>
+      </View>
+    );
+  }
+  
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => router.back()}>
         <Text style={styles.back}>← Quay lại</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Điểm danh lớp {className}</Text>
+      <Text style={styles.title}>Điểm danh lớp {scheduleInfo.class.name}</Text>
       <Text style={styles.subtitle}>
-        {subject} - {time} - Phòng {room}
+        {scheduleInfo.module.code} - {scheduleInfo.shift.startTime.substring(0,5)} - Phòng {scheduleInfo.classroom.name}
       </Text>
-      <Text style={styles.subtitle}>Ngày: {date}</Text>
+      <Text style={styles.subtitle}>Ngày: {scheduleInfo.date}</Text>
 
       <View style={styles.statsRow}>
         <StatBox
@@ -72,7 +135,7 @@ export default function ClassDetailScreen() {
         />
         <StatBox
           label="Có mặt"
-          value={countByStatus('present')}
+          value={countByStatus('Đang học')}
           color="#43A047"
           icon={<Ionicons name="checkmark-circle" size={24} color="#43A047" />}
         />
@@ -83,21 +146,18 @@ export default function ClassDetailScreen() {
           icon={<MaterialIcons name="access-time" size={24} color="#FBC02D" />}
         />
         <StatBox
-          label="Nghỉ CP"
-          value={countByStatus('excused')}
-          color="#1976D2"
-          icon={<Ionicons name="book" size={24} color="#1976D2" />}
-        />
-        <StatBox
-          label="Nghỉ KP"
-          value={countByStatus('unexcused')}
-          color="#D32F2F"
-          icon={<FontAwesome name="times-circle" size={24} color="#D32F2F" />}
+          label="Vắng mặt"
+          value={countByStatus('vắng mặt')}
+          color="#E53935"
+          icon={<Ionicons name="close-circle" size={24} color="#E53935" />}
         />
       </View>
 
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => setIsFaceScanCameraVisible(true)}
+        >
           <Ionicons name="camera" size={18} color="#fff" />
           <Text style={styles.buttonText}> Xác thực khuôn mặt</Text>
         </TouchableOpacity>
@@ -110,28 +170,68 @@ export default function ClassDetailScreen() {
       <Text style={styles.sectionTitle}>Danh sách học sinh</Text>
       <FlatList
         data={students}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.studentCard}>
-            <View style={styles.info}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.id}>MSSV: {item.id}</Text>
-              <View style={styles.radioRow}>
-                {renderRadio(item.id, 'present', item.status, updateStatus, 'Có mặt')}
-                {renderRadio(item.id, 'late', item.status, updateStatus, 'Đi muộn')}
-                {renderRadio(item.id, 'excused', item.status, updateStatus, 'Nghỉ CP')}
-                {renderRadio(item.id, 'unexcused', item.status, updateStatus, 'Nghỉ KP')}
+        keyExtractor={(item, index) => item?.student?.id?.toString() ?? index.toString()}
+        renderItem={({ item }) => {
+          // Skip rendering if student data is invalid
+          if (!item?.student) {
+            return null;
+          }
+          
+          return (
+            <View style={styles.studentCard}>
+              <View style={styles.info}>
+                <Text style={styles.name}>{item.student.name}</Text>
+                <Text style={styles.id}>MSSV: {item.student.studentId}</Text>
+                <View style={styles.radioRow}>
+                  {renderRadio(item.student.id, 'Đang học', item.status, updateStatus, 'Có mặt')}
+                  {renderRadio(item.student.id, 'late', item.status, updateStatus, 'Đi muộn')}
+                  {renderRadio(item.student.id, 'vắng mặt', item.status, updateStatus, 'Vắng mặt')}
+                </View>
+              </View>
+              <View style={styles.statusTag}>
+                <Text style={[styles.tagText, getStatusStyle(item.status)]}>
+                  {getStatusText(item.status)}
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setSelectedStudent(item.student);
+                    setIsFaceScanCameraVisible(true);
+                  }}
+                >
+                  <Ionicons name="camera" size={20} color="#777" style={{ marginTop: 4 }} />
+                </TouchableOpacity>
               </View>
             </View>
-            <View style={styles.statusTag}>
-              <Text style={[styles.tagText, getStatusStyle(item.status)]}>
-                {getStatusText(item.status)}
-              </Text>
-              <Ionicons name="camera" size={20} color="#777" style={{ marginTop: 4 }} />
-            </View>
-          </View>
-        )}
+          );
+        }}
       />
+
+      <Modal
+        visible={isFaceScanCameraVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsFaceScanCameraVisible(false)}
+      >
+        <FaceScanCamera
+          onClose={() => {
+            setIsFaceScanCameraVisible(false);
+            setSelectedStudent(null);
+          }}
+          onFaceDetected={(studentId) => {
+            // Handle face detection result
+            console.log('Face detected for student ID:', studentId);
+            
+            // Update the attendance status for the detected student
+            if (selectedStudent) {
+              updateStatus(selectedStudent.id, 'Đang học');
+            }
+            
+            setIsFaceScanCameraVisible(false);
+            setSelectedStudent(null);
+          }}
+          studentName={selectedStudent?.name}
+        />
+      </Modal>
     </View>
   );
 }
@@ -157,10 +257,10 @@ function StatBox({
 }
 
 function renderRadio(
-  id: string,
-  value: Student['status'],
-  current: Student['status'],
-  update: (id: string, newStatus: Student['status']) => void,
+  id: number,
+  value: StudentAttendance['status'],
+  current: StudentAttendance['status'],
+  update: (id: number, newStatus: StudentAttendance['status']) => void,
   label: string
 ) {
   return (
@@ -187,20 +287,18 @@ function renderRadio(
   );
 }
 
-function getStatusText(status: Student['status']) {
+function getStatusText(status: StudentAttendance['status']) {
   switch (status) {
-    case 'present':
+    case 'Đang học':
       return 'Có mặt';
     case 'late':
       return 'Đi muộn';
-    case 'excused':
-      return 'Nghỉ CP';
-    case 'unexcused':
-      return 'Nghỉ KP';
+    case 'vắng mặt':
+      return 'Vắng mặt';
   }
 }
 
-function getStatusStyle(status: Student['status']) {
+function getStatusStyle(status: StudentAttendance['status']) {
   const common = {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -209,13 +307,11 @@ function getStatusStyle(status: Student['status']) {
   };
 
   switch (status) {
-    case 'present':
+    case 'Đang học':
       return { ...common, backgroundColor: '#F1F8E9', color: '#2E7D32' };
     case 'late':
       return { ...common, backgroundColor: '#FFF9C4', color: '#F9A825' };
-    case 'excused':
-      return { ...common, backgroundColor: '#E3F2FD', color: '#1976D2' };
-    case 'unexcused':
+    case 'vắng mặt':
       return { ...common, backgroundColor: '#FFEBEE', color: '#C62828' };
   }
 }
@@ -229,13 +325,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
-    gap: 10,
+    gap: 8,
     justifyContent: 'space-between',
   },
   statBox: {
-    width: '30%',
+    width: '23%',
     borderWidth: 1.5,
-    padding: 10,
+    padding: 8,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,

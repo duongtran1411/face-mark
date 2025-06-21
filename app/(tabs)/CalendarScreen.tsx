@@ -1,200 +1,322 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
-import { Calendar } from 'react-native-calendars';
-import dayjs from 'dayjs';
-import { useRouter } from 'expo-router';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-
-type ClassItem = {
-  subject: string;
-  time: string;
-  className: string;
-  students: number;
-  room: string;
-};
+import { getScheduleTeacher } from "@/service/schedule/schedule.api";
+import { FontAwesome5, Ionicons } from "@expo/vector-icons";
+import dayjs from "dayjs";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Calendar } from "react-native-calendars";
+import { Schedule } from "@/models/Schedule";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function CalendarScreen() {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<string>(dayjs().format('YYYY-MM-DD'));
+  const [selectedDate, setSelectedDate] = useState<string>(
+    dayjs().format("YYYY-MM-DD")
+  );
+  const [schedule, setSchedule] = useState<Schedule[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const teachingDays: Record<string, ClassItem[]> = {
-    '2025-06-19': [
-      { subject: 'Toán học', time: '07:30 - 09:00', className: '10A1', students: 35, room: 'B201' },
-      { subject: 'Vật lý', time: '09:15 - 10:45', className: '11A2', students: 32, room: 'B202' },
-      { subject: 'Toán học', time: '13:30 - 15:00', className: '12A1', students: 38, room: 'B203' },
-    ],
-  };
-
-  const markedDates = Object.keys(teachingDays).reduce((acc, date) => {
-    acc[date] = {
-      customStyles: {
-        container: {
-          backgroundColor: date === selectedDate ? '#A5D6A7' : undefined,
-        },
-        text: {
-          color: '#000',
-        },
-        // Gạch ngang hiển thị dưới số ngày
-        marked: true,
-      },
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      try {
+        const token = await AsyncStorage.getItem("access_token");
+        const scheduleData = await getScheduleTeacher(selectedDate, token || "");
+        console.log(scheduleData);
+        setSchedule(scheduleData || []); // Ensure schedule is always an array
+      } catch (error) {
+        console.error("Failed to fetch schedule:", error);
+        setSchedule([]); // Reset on error
+      } finally {
+        setIsLoading(false);
+      }
     };
+    fetchSchedule();
+  }, [selectedDate]);
 
-    return acc;
-  }, {} as Record<string, any>);
+  const renderScheduleItem = ({ item }: { item: Schedule }) => (
+    <View style={styles.classItemContainer}>
+      {/* --- Timeline Column --- */}
+      <View style={styles.timelineColumn}>
+        <View style={styles.slotContainer}>
+          <Text style={styles.slotText}>Slot: {item.shift.id}</Text>
+        </View>
+        <View style={styles.timeline}>
+          <Text style={styles.timeText}>{item.shift.startTime.substring(0, 5)}</Text>
+          <View style={styles.timelineLine} />
+          <Text style={styles.timeText}>{item.shift.endTime.substring(0, 5)}</Text>
+        </View>
+      </View>
 
-  const classList = teachingDays[selectedDate] || [];
+      {/* --- Details Column --- */}
+      <View style={styles.detailsColumn}>
+        <Text style={styles.roomText}>Room: {item.classroom.name}</Text>
+        <Text style={styles.subjectText}>Subject Code: {item.module.code}</Text>
+        <Text style={styles.infoText}>Group class: {item.class.name}</Text>
+        <Text style={styles.infoText}>Lecturer: {item.teacher.name}</Text>
+
+        <View style={styles.buttonsRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.presentButton]}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/ClassDetailScreen",
+                params: { scheduleId: item.id.toString() },
+              })
+            }>
+            <Text style={styles.buttonText}>Điểm danh</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <Calendar
+          onDayPress={(day) => setSelectedDate(day.dateString)}
+          markedDates={{
+            [selectedDate]: { selected: true, marked: true, selectedColor: "#007BFF" },
+          }}
+          theme={{
+            todayTextColor: "#007BFF",
+            arrowColor: "#007BFF",
+            selectedDayTextColor: '#ffffff',
+          }}
+        />
+
+        <View style={styles.scheduleContainer}>
+          {schedule.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <FontAwesome5
+                name="calendar-times"
+                size={64}
+                color="#ccc"
+                style={{ opacity: 0.3 }}
+              />
+              <Text style={styles.noClass}>
+                Không có lịch học trong ngày này
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.dayContainer}>
+              {/* --- Date Column --- */}
+              <View style={styles.dateColumn}>
+                <Text style={styles.dateText}>
+                  {dayjs(selectedDate).format("D/M")}
+                </Text>
+                <Text style={styles.dayText}>
+                  {dayjs(selectedDate).format("ddd")}
+                </Text>
+              </View>
+
+              {/* --- Class List Column --- */}
+              <FlatList
+                data={schedule}
+                keyExtractor={(item) => item.module.code + item.shift.id}
+                renderItem={renderScheduleItem}
+                ItemSeparatorComponent={() => (
+                  <View style={styles.itemSeparator} />
+                )}
+                style={styles.classList}
+              />
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.appTitle}>📘 Hệ thống điểm danh học sinh</Text>
-        <TouchableOpacity >
-          <Ionicons name="log-out-outline" size={24} color="#2E7D32" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Calendar */}
       <Calendar
-        markingType="custom"
-        markedDates={Object.keys(teachingDays).reduce((acc, date) => {
-          const isSelected = date === selectedDate;
-          acc[date] = {
-            customStyles: {
-              container: {
-                backgroundColor: isSelected ? '#A5D6A7' : 'transparent',
-                borderBottomWidth: isSelected ? 0 : 2,
-                borderBottomColor: '#4CAF50',
-              },
-              text: {
-                color: isSelected ? '#fff' : '#000',
-              },
-            },
-          };
-          return acc;
-        }, {} as Record<string, any>)}
         onDayPress={(day) => setSelectedDate(day.dateString)}
+        markedDates={{
+          [selectedDate]: { selected: true, marked: true, selectedColor: "#007BFF" },
+        }}
         theme={{
-          selectedDayBackgroundColor: '#4CAF50',
-          todayTextColor: '#4CAF50',
-          arrowColor: '#4CAF50',
+          todayTextColor: "#007BFF",
+          arrowColor: "#007BFF",
+          selectedDayTextColor: '#ffffff',
         }}
       />
 
+      <View style={styles.scheduleContainer}>
+        {schedule.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <FontAwesome5
+              name="calendar-times"
+              size={64}
+              color="#ccc"
+              style={{ opacity: 0.3 }}
+            />
+            <Text style={styles.noClass}>
+              Không có lịch học trong ngày này
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.dayContainer}>
+            {/* --- Date Column --- */}
+            <View style={styles.dateColumn}>
+              <Text style={styles.dateText}>
+                {dayjs(selectedDate).format("D/M")}
+              </Text>
+              <Text style={styles.dayText}>
+                {dayjs(selectedDate).format("ddd")}
+              </Text>
+            </View>
 
-
-      {/* Date Title */}
-      <Text style={styles.title}>
-        📅 Lịch học ngày {dayjs(selectedDate).format('DD/MM/YYYY')}
-      </Text>
-
-      {/* Class List */}
-      {classList.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <FontAwesome5 name="calendar-times" size={64} color="#ccc" style={{ opacity: 0.3 }} />
-          <Text style={styles.noClass}>Không có lớp học nào trong ngày này</Text>
-        </View>) : (
-        <FlatList
-          data={classList}
-          keyExtractor={(_, index) => index.toString()}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: '/(tabs)/ClassDetailScreen',
-                  params: {
-                    className: item.className,
-                    subject: item.subject,
-                    time: item.time,
-                    room: item.room,
-                    date: dayjs(selectedDate).format('DD/MM/YYYY'),
-                  },
-                })
-              }>
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.subject}>{item.subject}</Text>
-                  <Text style={styles.time}>{item.time}</Text>
-                </View>
-                <View style={styles.cardContent}>
-                  <Text style={styles.detail}>
-                    <FontAwesome5 name="chalkboard-teacher" size={14} /> Lớp: {item.className} ({item.students} học sinh)
-                  </Text>
-                  <Text style={styles.detail}>
-                    <FontAwesome5 name="school" size={14} /> Phòng: {item.room}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
-        />
-      )}
+            {/* --- Class List Column --- */}
+            <FlatList
+              data={schedule}
+              keyExtractor={(item) => item.module.code + item.shift.id}
+              renderItem={renderScheduleItem}
+              ItemSeparatorComponent={() => (
+                <View style={styles.itemSeparator} />
+              )}
+              style={styles.classList}
+            />
+          </View>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    height: 50
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  scheduleContainer: {
+    flex: 1,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    marginTop: 10,
   },
-  appTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-
+  dayContainer: {
+    flex: 1,
+    flexDirection: "row",
   },
-  title: { fontSize: 18, fontWeight: 'bold', marginTop: 16, color: '#2E7D32' },
-  card: {
-    marginTop: 14,
-    padding: 16,
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 1 },
-    shadowRadius: 4,
+  classList: {
+    flex: 1,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+  dateColumn: {
+    width: 60,
+    alignItems: "center",
+    paddingTop: 15,
+    borderRightWidth: 1,
+    borderRightColor: "#E0E0E0",
   },
-  subject: { fontSize: 18, fontWeight: '600', color: '#1B5E20' },
-  time: {
-    fontSize: 13,
-    backgroundColor: '#C8E6C9',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    color: '#004D40',
-    fontWeight: 'bold',
+  dateText: {
+    fontSize: 16,
+    color: "#007BFF",
+    fontWeight: "bold",
   },
-  cardContent: { marginTop: 4 },
-  detail: {
+  dayText: {
     fontSize: 14,
-    color: '#424242',
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
+    color: "#007BFF",
+  },
+  classItemContainer: {
+    flex: 1,
+    flexDirection: "row",
+    padding: 15,
+  },
+  timelineColumn: {
+    width: 70,
+    alignItems: "center",
+  },
+  slotContainer: {
+    position: 'absolute',
+    left: -25,
+    top:35,
+    transform: [{ rotate: '-90deg' }],
+    backgroundColor: '#F0F0F0',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  slotText: {
+    fontSize: 12,
+    color: "#333",
+    fontWeight: 'bold',
+  },
+  timeline: {
+    paddingTop: 8,
+    paddingLeft:20,
+    alignItems: "center",
+  },
+  timeText: {
+    fontSize: 12,
+    color: "#666",
+  },
+  timelineLine: {
+    width: 1,
+    height: 50,
+    backgroundColor: "#999",
+    marginVertical: 4,
+  },
+  detailsColumn: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  roomText: {
+    fontWeight: "bold",
+    color: "#8B4513",
+    fontSize: 16,
+  },
+  subjectText: {
+    fontWeight: "bold",
+    color: "#00008B",
+    fontSize: 16,
+    marginVertical: 2,
+  },
+  infoText: {
+    color: "#555",
+    fontSize: 13,
+  },
+  buttonsRow: {
+    flexDirection: "row",
+    marginTop: 10,
+    alignItems: "center",
+  },
+  button: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 15,
+    marginRight: 10,
+  },
+  presentButton: {
+    backgroundColor: "#4CAF50",
+  },
+  buttonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+  daySeparator: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+  },
+  itemSeparator: {
+    height: 1,
+    backgroundColor: "#E0E0E0",
+    marginVertical: 10,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 32,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   noClass: {
     fontSize: 16,
     marginTop: 10,
-    color: '#999',
-    textAlign: 'center',
+    color: "#999",
+    textAlign: "center",
   },
 });

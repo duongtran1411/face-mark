@@ -6,7 +6,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -36,7 +35,7 @@ export default function LoginScreen() {
     }
   };
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' || Platform.OS === 'android' ? "padding" : undefined}
         style={styles.container}
@@ -71,7 +70,7 @@ export default function LoginScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -79,10 +78,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#fff",
+    width: '100%', // Đảm bảo chiếm toàn bộ chiều rộng
   },
   container: {
     flex: 1,
     justifyContent: "center",
+    width: '100%', // Đảm bảo chiếm toàn bộ chiều rộng
   },
   innerContainer: {     
     width: "100%",      
