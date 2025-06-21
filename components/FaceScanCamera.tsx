@@ -12,10 +12,11 @@ import {
 
 import type { CameraView as ExpoCameraView } from "expo-camera";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import Toast from "react-native-toast-message";
 
 interface FaceScanCameraProps {
   onClose: () => void;
-  onFaceDetected: (studentId: number) => void;
+  onScanComplete: (base64Image: string) => void;
   studentName?: string;
 }
 
@@ -23,7 +24,7 @@ const { width, height } = Dimensions.get("window");
 
 export default function FaceScanCamera({
   onClose,
-  onFaceDetected,
+  onScanComplete,
   studentName,
 }: FaceScanCameraProps) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -37,34 +38,40 @@ export default function FaceScanCamera({
   }, [permission]);
 
   const handleScan = async () => {
+    if (isScanning) return;
     setIsScanning(true);
 
     if (Platform.OS !== "web" && cameraRef.current) {
       try {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        Alert.alert(
-          "Xác thực thành công",
-          `Đã nhận diện ${studentName || "học sinh"}.`
-        );
-        onFaceDetected(1);
-        onClose();
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.7,
+          base64: true,
+          exif: false,
+        });
+        if (photo?.base64) {
+          onScanComplete(photo.base64);
+        } else {
+          Toast.show({
+            type:'error',
+            text1:'không thể lấy dữ liệu ảnh'
+          });
+          setIsScanning(false);
+        }
       } catch (error) {
-        Alert.alert("Lỗi", "Không thể chụp ảnh.");
-      } finally {
+        console.error("Lỗi chụp ảnh:", error);
+        Toast.show({
+          type:'error',
+          text1:'không thể xác thực khuôn mặt'
+        });
         setIsScanning(false);
       }
     } else {
+      // Logic mô phỏng cho web
       try {
         await new Promise((resolve) => setTimeout(resolve, 1500));
-        Alert.alert(
-          "Xác thực thành công (Mô phỏng)",
-          `Đã nhận diện ${studentName || "học sinh"}.`
-        );
-        onFaceDetected(1);
-        onClose();
+        onScanComplete("fake_base64_string_for_web_testing");
       } catch (error) {
-        Alert.alert("Lỗi", "Không thể quét khuôn mặt.");
-      } finally {
+        Alert.alert("Lỗi", "Không thể quét khuôn mặt (mô phỏng).");
         setIsScanning(false);
       }
     }
@@ -116,7 +123,7 @@ export default function FaceScanCamera({
             color={isScanning ? "#888" : "#fff"}
           />
           <Text style={styles.scanButtonText}>
-            {isScanning ? "Đang quét..." : "Quét khuôn mặt"}
+            {isScanning ? "Đang xử lý..." : "Quét khuôn mặt"}
           </Text>
         </TouchableOpacity>
       </View>
