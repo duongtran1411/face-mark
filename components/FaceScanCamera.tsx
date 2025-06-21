@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Dimensions,
   Platform,
   StyleSheet,
@@ -10,11 +9,11 @@ import {
   View,
 } from "react-native";
 
+import { FaceVerifyImage } from "@/service/face-verify/face-verify.api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { CameraView as ExpoCameraView } from "expo-camera";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import Toast from "react-native-toast-message";
-import { FaceVerifyImage } from "@/service/face-verify/face-verify.api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface FaceScanCameraProps {
   onClose: () => void;
@@ -45,28 +44,36 @@ export default function FaceScanCamera({
 
   const handleScan = async () => {
     if (isScanning || !cameraRef.current) return;
-    
+
     setIsScanning(true);
     Toast.show({
-      type: 'info',
-      text1: 'Đang xử lý ảnh...',
+      type: "info",
+      text1: "Đang xử lý ảnh...",
     });
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.7,
+        quality: 0.9,
         base64: true,
         exif: false,
       });
 
       if (!photo?.base64) {
-        Toast.show({ type:'error', text1:'Không thể lấy dữ liệu ảnh' });
+        Toast.show({ type: "error", text1: "Không thể lấy dữ liệu ảnh" });
         setIsScanning(false);
         return;
       }
 
-      const token = await AsyncStorage.getItem("access_token") || "";
-      const result = await FaceVerifyImage(studentId, scheduleId, photo.base64, token);
+      const token = (await AsyncStorage.getItem("access_token")) || "";
+      // For now, use JPEG as default format since expo-camera typically returns JPEG
+      // If you need to support other formats, you can modify the takePictureAsync options
+      const imageDataUrl = `data:image/jpeg;base64,${photo.base64}`;
+      const result = await FaceVerifyImage(
+        studentId,
+        scheduleId,
+        imageDataUrl,
+        token
+      );
 
       if (result) {
         onVerificationSuccess(studentId);
@@ -75,9 +82,24 @@ export default function FaceScanCamera({
         // Error toast is shown by the API service, just reset scanning state
         setIsScanning(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Lỗi chụp ảnh hoặc xác thực:", error);
-      Toast.show({ type:'error', text1:'Không thể xác thực khuôn mặt' });
+
+      // Xử lý lỗi cụ thể từ backend
+      if (error?.response?.data?.message) {
+        const errorMessage = error.response.data.message;
+        if (errorMessage.includes("Không phát hiện được khuôn mặt")) {
+          Toast.show({
+            type: "error",
+            text1: "Không phát hiện được khuôn mặt",
+            text2: "Hãy đảm bảo khuôn mặt rõ ràng và đủ ánh sáng",
+          });
+        } else {
+          Toast.show({ type: "error", text1: errorMessage });
+        }
+      } else {
+        Toast.show({ type: "error", text1: "Không thể xác thực khuôn mặt" });
+      }
       setIsScanning(false);
     }
   };
@@ -103,6 +125,14 @@ export default function FaceScanCamera({
           {studentName
             ? `Đặt khuôn mặt của ${studentName} vào khung`
             : "Đặt khuôn mặt vào khung"}
+        </Text>
+        <Text
+          style={[
+            styles.scanText,
+            { fontSize: 14, marginTop: 10, opacity: 0.8 },
+          ]}
+        >
+          Đảm bảo khuôn mặt rõ ràng, đủ ánh sáng và nhìn thẳng vào camera
         </Text>
         {Platform.OS === "web" && (
           <Text
