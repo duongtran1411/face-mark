@@ -75,6 +75,7 @@ export default function FaceScanCamera({
         token
       );
 
+      console.log(result);
       if (result) {
         onVerificationSuccess(studentId);
         onClose(); // Close camera on success
@@ -111,7 +112,7 @@ export default function FaceScanCamera({
           <Ionicons name="close-outline" size={30} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerText}>Quét khuôn mặt</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40 }} />image.png
       </View>
 
       <View style={styles.scanArea}>
@@ -197,7 +198,7 @@ export default function FaceScanCamera({
       );
     }
     return (
-      <CameraView ref={cameraRef} style={styles.container} facing="back">
+      <CameraView ref={cameraRef} style={styles.container} facing="front">
         {renderOverlay()}
       </CameraView>
     );

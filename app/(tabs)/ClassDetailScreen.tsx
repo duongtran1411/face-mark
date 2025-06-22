@@ -1,30 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Pressable,
-  TouchableOpacity,
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Alert,
-  TextInput
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import FaceScanCamera from '@/components/FaceScanCamera';
+import { Schedule } from '@/models/Schedule';
+import { Student } from '@/models/Student';
+import { getScheduleById } from '@/service/schedule/schedule.api';
+import { getStudentByClass } from '@/service/student/student.api';
 import {
   FontAwesome,
-  MaterialIcons,
   Ionicons,
-  Entypo,
+  MaterialIcons
 } from '@expo/vector-icons';
-import { Student } from '@/models/Student';
-import { getStudentByClass } from '@/service/student/student.api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Schedule } from '@/models/Schedule';
-import { getScheduleById } from '@/service/schedule/schedule.api';
-import FaceScanCamera from '@/components/FaceScanCamera';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import Toast from 'react-native-toast-message';
 
 // Student type now directly uses the Student model
@@ -75,23 +72,18 @@ export default function ClassDetailScreen() {
 
         // Ensure studentData is an array and filter out invalid entries
         if (Array.isArray(studentData)) {
-          console.log('studentData', studentData);
-          console.log('First item structure:', studentData[0]);
 
           const initialStudents: StudentAttendance[] = studentData
             .filter((response: any) => {
-              console.log('Filtering item:', response);
               return response?.student; // Check if student exists directly
             })
             .map((response: { student: Student; status?: string }) => {
-              console.log('Mapping item:', response);
               return {
                 student: response.student,
                 status: 'Đang học',
               };
             });
           setStudents(initialStudents);
-          console.log('initialstudent', initialStudents);
         } else {
           console.error("API for students did not return an array.");
           setStudents([]);

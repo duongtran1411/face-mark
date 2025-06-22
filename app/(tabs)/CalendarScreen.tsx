@@ -1,5 +1,7 @@
+import { Schedule } from "@/models/Schedule";
 import { getScheduleTeacher } from "@/service/schedule/schedule.api";
 import { FontAwesome5, Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -11,8 +13,6 @@ import {
   View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
-import { Schedule } from "@/models/Schedule";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function CalendarScreen() {
   const router = useRouter();
@@ -27,7 +27,6 @@ export default function CalendarScreen() {
       try {
         const token = await AsyncStorage.getItem("access_token");
         const scheduleData = await getScheduleTeacher(selectedDate, token || "");
-        console.log(scheduleData);
         setSchedule(scheduleData || []); // Ensure schedule is always an array
       } catch (error) {
         console.error("Failed to fetch schedule:", error);
