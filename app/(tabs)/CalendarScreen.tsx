@@ -72,6 +72,8 @@ export default function CalendarScreen() {
             <Text style={styles.buttonText}>Điểm danh</Text>
           </TouchableOpacity>
         </View>
+
+        
       </View>
     </View>
   );
@@ -79,6 +81,13 @@ export default function CalendarScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
+        <View style={styles.header}>
+  <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+    <Ionicons name="arrow-back" size={24} color="green" />
+    <Text style={styles.backText}>Quay lại</Text>
+  </TouchableOpacity>
+</View>
+
         <Calendar
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={{
@@ -135,6 +144,13 @@ export default function CalendarScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+  <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+    <Ionicons name="arrow-back" size={24} color="green" />
+    <Text style={styles.backText}>Quay lại</Text>
+  </TouchableOpacity>
+</View>
+
       <Calendar
         onDayPress={(day) => setSelectedDate(day.dateString)}
         markedDates={{
@@ -319,4 +335,25 @@ const styles = StyleSheet.create({
     color: "#999",
     textAlign: "center",
   },
+    header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    color: 'green',
+  },
+  backText: {
+    fontSize: 16,
+    color: 'green',
+    marginLeft: 5,
+    fontWeight: '600',
+  },
+
 });

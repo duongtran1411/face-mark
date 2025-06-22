@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   Alert,
+  TextInput
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -42,6 +43,11 @@ export default function ClassDetailScreen() {
   const [isFaceScanCameraVisible, setIsFaceScanCameraVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
+  const [lateReasonModalVisible, setLateReasonModalVisible] = useState(false);
+  const [lateReasonText, setLateReasonText] = useState('');
+  const [lateReasonStudentId, setLateReasonStudentId] = useState<number | null>(null);
+  const [lateReasons, setLateReasons] = useState<Record<number, string>>({});
+
   const handleVerificationSuccess = (verifiedStudentId: number) => {
     Toast.show({
       type: 'success',
@@ -58,20 +64,20 @@ export default function ClassDetailScreen() {
       setIsLoading(true);
       try {
         const token = await AsyncStorage.getItem("access_token") || "";
-        
+
         // Fetch both schedule details and student list concurrently
         const [scheduleData, studentData] = await Promise.all([
           getScheduleById(parseInt(scheduleId, 10), token),
           getStudentByClass(parseInt(scheduleId, 10), token)
         ]);
-        
+
         setScheduleInfo(scheduleData);
 
         // Ensure studentData is an array and filter out invalid entries
         if (Array.isArray(studentData)) {
           console.log('studentData', studentData);
           console.log('First item structure:', studentData[0]);
-          
+
           const initialStudents: StudentAttendance[] = studentData
             .filter((response: any) => {
               console.log('Filtering item:', response);
@@ -81,7 +87,7 @@ export default function ClassDetailScreen() {
               console.log('Mapping item:', response);
               return {
                 student: response.student,
-                status: 'Đang học', 
+                status: 'Đang học',
               };
             });
           setStudents(initialStudents);
@@ -126,7 +132,7 @@ export default function ClassDetailScreen() {
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={() => router.back()}>
@@ -135,7 +141,7 @@ export default function ClassDetailScreen() {
 
       <Text style={styles.title}>Điểm danh lớp {scheduleInfo.class.name}</Text>
       <Text style={styles.subtitle}>
-        {scheduleInfo.module.code} - {scheduleInfo.shift.startTime.substring(0,5)} - Phòng {scheduleInfo.classroom.name}
+        {scheduleInfo.module.code} - {scheduleInfo.shift.startTime.substring(0, 5)} - Phòng {scheduleInfo.classroom.name}
       </Text>
       <Text style={styles.subtitle}>Ngày: {scheduleInfo.date}</Text>
 
@@ -167,7 +173,7 @@ export default function ClassDetailScreen() {
       </View>
 
       <View style={styles.actionRow}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.button}
           onPress={() => setIsFaceScanCameraVisible(true)}
         >
@@ -189,7 +195,7 @@ export default function ClassDetailScreen() {
           if (!item?.student) {
             return null;
           }
-          
+
           return (
             <View style={styles.studentCard}>
               <View style={styles.info}>
@@ -197,15 +203,17 @@ export default function ClassDetailScreen() {
                 <Text style={styles.id}>MSSV: {item.student.studentId}</Text>
                 <View style={styles.radioRow}>
                   {renderRadio(item.student.id, 'Đang học', item.status, updateStatus, 'Có mặt')}
-                  {renderRadio(item.student.id, 'late', item.status, updateStatus, 'Đi muộn')}
-                  {renderRadio(item.student.id, 'vắng mặt', item.status, updateStatus, 'Vắng mặt')}
+                  {renderRadio(item.student.id, 'late', item.status, updateStatus, 'Đi muộn', () => {
+                    setLateReasonStudentId(item.student.id);
+                    setLateReasonModalVisible(true);
+                  })}                  {renderRadio(item.student.id, 'vắng mặt', item.status, updateStatus, 'Vắng mặt')}
                 </View>
               </View>
               <View style={styles.statusTag}>
                 <Text style={[styles.tagText, getStatusStyle(item.status)]}>
                   {getStatusText(item.status)}
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => {
                     setSelectedStudent(item.student);
                     setIsFaceScanCameraVisible(true);
@@ -214,6 +222,58 @@ export default function ClassDetailScreen() {
                   <Ionicons name="camera" size={20} color="#777" style={{ marginTop: 4 }} />
                 </TouchableOpacity>
               </View>
+              <Modal
+                visible={lateReasonModalVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setLateReasonModalVisible(false)}
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Nhập lý do đi muộn</Text>
+                    <View style={styles.modalInputWrapper}>
+                      <Text style={styles.modalLabel}>Lý do:</Text>
+                      <TextInput
+                        style={styles.modalInput}
+                        placeholder="Nhập lý do tại đây..."
+                        value={lateReasonText}
+                        onChangeText={setLateReasonText}
+                        multiline
+                      />
+                    </View>
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        style={styles.modalButton}
+                        onPress={() => {
+                          if (lateReasonStudentId !== null) {
+                            setLateReasons((prev) => ({
+                              ...prev,
+                              [lateReasonStudentId]: lateReasonText,
+                            }));
+                            updateStatus(lateReasonStudentId, 'late');
+                          }
+                          setLateReasonModalVisible(false);
+                          setLateReasonText('');
+                          setLateReasonStudentId(null);
+                        }}
+                      >
+                        <Text style={styles.modalButtonText}>Lưu</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.modalCancel]}
+                        onPress={() => {
+                          setLateReasonModalVisible(false);
+                          setLateReasonText('');
+                          setLateReasonStudentId(null);
+                        }}
+                      >
+                        <Text style={[styles.modalButtonText, { color: '#C62828' }]}>Quay lại</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+
             </View>
           );
         }}
@@ -270,11 +330,18 @@ function renderRadio(
   value: StudentAttendance['status'],
   current: StudentAttendance['status'],
   update: (id: number, newStatus: StudentAttendance['status']) => void,
-  label: string
+  label: string,
+  showLateModal?: () => void
 ) {
   return (
     <Pressable
-      onPress={() => update(id, value)}
+      onPress={() => {
+        if (value === 'late') {
+          showLateModal?.();
+        } else {
+          update(id, value);
+        }
+      }}
       style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
       <View
         style={{
@@ -295,6 +362,7 @@ function renderRadio(
     </Pressable>
   );
 }
+
 
 function getStatusText(status: StudentAttendance['status']) {
   switch (status) {
@@ -397,4 +465,57 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   tagText: { fontSize: 12 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalInputWrapper: {
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  modalInput: {
+    height: 80,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 8,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    padding: 10,
+    backgroundColor: '#2E7D32',
+    borderRadius: 6,
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  modalCancel: {
+    backgroundColor: '#eee',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+
 });
