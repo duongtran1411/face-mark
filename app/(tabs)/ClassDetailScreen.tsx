@@ -80,12 +80,11 @@ export default function ClassDetailScreen() {
             .map((response: { student: Student; status?: string }) => {
               return {
                 student: response.student,
-                status: 'Đang học',
+                status: 'vắng mặt',
               };
             });
           setStudents(initialStudents);
         } else {
-          console.error("API for students did not return an array.");
           setStudents([]);
         }
 

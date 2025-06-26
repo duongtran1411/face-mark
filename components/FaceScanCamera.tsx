@@ -84,20 +84,22 @@ export default function FaceScanCamera({
         setIsScanning(false);
       }
     } catch (error: any) {
-      console.error("Lỗi chụp ảnh hoặc xác thực:", error);
+      console.error("Lỗi chụp ảnh hoặc xác thực:", error, error?.response);
 
-      // Xử lý lỗi cụ thể từ backend
-      if (error?.response?.data?.message) {
-        const errorMessage = error.response.data.message;
+      // Nếu có response từ server
+      if (error && error.response && error.response.data && error.response.data.message) {
+        const errorMessage: string = error.response.data.message;
         if (errorMessage.includes("Không phát hiện được khuôn mặt")) {
           Toast.show({
             type: "error",
             text1: "Không phát hiện được khuôn mặt",
-            text2: "Hãy đảm bảo khuôn mặt rõ ràng và đủ ánh sáng",
+            text2: "Hãy đảm bảo khuôn mặt rõ ràng, đủ ánh sáng và nhìn thẳng vào camera",
           });
         } else {
           Toast.show({ type: "error", text1: errorMessage });
         }
+      } else if (typeof error === "string") {
+        Toast.show({ type: "error", text1: error });
       } else {
         Toast.show({ type: "error", text1: "Không thể xác thực khuôn mặt" });
       }
