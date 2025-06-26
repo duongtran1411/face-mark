@@ -2,6 +2,10 @@ import FaceScanCamera from "@/components/FaceScanCamera";
 import { Schedule } from "@/models/Schedule";
 import { Student } from "@/models/Student";
 import { StudentAttendance } from "@/models/StudentAttendance";
+import {
+  markAttendance,
+  markMultipleAttendance,
+} from "@/service/attendance/attendance.api";
 import { getScheduleById } from "@/service/schedule/schedule.api";
 import { getStudentByClass } from "@/service/student/student.api";
 import { FontAwesome, Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -10,6 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -32,8 +37,11 @@ export default function ClassDetailScreen() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [lateReasonModalVisible, setLateReasonModalVisible] = useState(false);
   const [lateReasonText, setLateReasonText] = useState("");
-  const [lateReasonStudentId, setLateReasonStudentId] = useState<number | null>(null);
+  const [lateReasonStudentId, setLateReasonStudentId] = useState<number | null>(
+    null
+  );
   const [lateReasons, setLateReasons] = useState<Record<number, string>>({});
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
 
   const handleVerificationSuccess = (verifiedStudentId: number) => {
     Toast.show({
@@ -50,6 +58,138 @@ export default function ClassDetailScreen() {
     setLateReasonModalVisible(true);
   };
 
+  const callAttendanceAPI = async (
+    studentId: number,
+    status: number,
+    note?: string
+  ) => {
+    try {
+      const token = (await AsyncStorage.getItem("access_token")) || "";
+      if (!scheduleInfo) return;
+
+      await markAttendance(
+        {
+          status,
+          note,
+          teacherId: scheduleInfo.teacher.id,
+          studentId,
+          classId: scheduleInfo.class.id,
+          scheduleId: parseInt(scheduleId, 10),
+        },
+        token
+      );
+
+      Toast.show({
+        type: "success",
+        text1: "Cập nhật điểm danh thành công!",
+      });
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Có lỗi xảy ra khi cập nhật điểm danh",
+      });
+    }
+  };
+
+  const handleMarkAllAttendance = async () => {
+    if (!scheduleInfo) return;
+
+    setIsMarkingAll(true);
+    try {
+      const token = (await AsyncStorage.getItem("access_token")) || "";
+
+      // Tạo array data cho tất cả students với status = 1 (có mặt)
+      const attendanceData = students.map((student) => ({
+        status: 1, // Có mặt
+        teacherId: scheduleInfo.teacher.id,
+        studentId: student.student.id,
+        classId: scheduleInfo.class.id,
+        scheduleId: parseInt(scheduleId, 10),
+      }));
+
+      await markMultipleAttendance(attendanceData, token);
+
+      // Cập nhật UI - tất cả students thành có mặt
+      setStudents((prev) => prev.map((student) => ({ ...student, status: 1 })));
+
+      Toast.show({
+        type: "success",
+        text1: "Điểm danh tất cả thành công!",
+        text2: `Đã điểm danh ${students.length} sinh viên.`,
+      });
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Có lỗi xảy ra khi điểm danh tất cả",
+      });
+    } finally {
+      setIsMarkingAll(false);
+    }
+  };
+
+  const showMarkAllConfirmation = () => {
+    Alert.alert(
+      "Xác nhận điểm danh",
+      `Bạn có chắc chắn muốn điểm danh tất cả ${students.length} sinh viên là "Có mặt"?`,
+      [
+        {
+          text: "Hủy",
+          style: "cancel",
+        },
+        {
+          text: "Đồng ý",
+          onPress: handleMarkAllAttendance,
+        },
+      ]
+    );
+  };
+
+  const updateStatus = async (
+    id: number,
+    newStatus: StudentAttendance["status"]
+  ) => {
+    // Cập nhật UI ngay lập tức
+    setStudents((prev) =>
+      prev.map((s) => (s.student.id === id ? { ...s, status: newStatus } : s))
+    );
+
+    // Gọi API để cập nhật backend
+    if (newStatus === 2) {
+      // Đi muộn - sẽ được xử lý trong modal
+      return;
+    }
+
+    // Có mặt hoặc vắng mặt
+    await callAttendanceAPI(id, newStatus);
+  };
+
+  const handleLateReasonSave = async () => {
+    if (lateReasonStudentId !== null) {
+      const note = lateReasonText.trim();
+
+      // Cập nhật UI
+      setLateReasons((prev) => ({
+        ...prev,
+        [lateReasonStudentId]: note,
+      }));
+
+      // Cập nhật status trong students array
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.student.id === lateReasonStudentId ? { ...s, status: 2, note } : s
+        )
+      );
+
+      // Gọi API với note
+      await callAttendanceAPI(lateReasonStudentId, 2, note);
+
+      // Đóng modal
+      setLateReasonModalVisible(false);
+      setLateReasonText("");
+      setLateReasonStudentId(null);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       if (!scheduleId) return;
@@ -64,7 +204,7 @@ export default function ClassDetailScreen() {
         ]);
 
         setScheduleInfo(scheduleData);
-
+        console.log("studentData", studentData.students);
         const mapStatus = (rawStatus: any): 1 | 2 | 3 => {
           // Nếu backend trả số
           if (rawStatus === 1) return 1; // Có mặt
@@ -79,15 +219,30 @@ export default function ClassDetailScreen() {
         };
 
         // Ensure studentData is an array and filter out invalid entries
-        if (Array.isArray(studentData)) {
-          const initialStudents: StudentAttendance[] = studentData
+        if (Array.isArray(studentData.students)) {
+          const initialStudents: StudentAttendance[] = studentData.students
             .filter((response: any) => response?.student)
-            .map((response: { student: Student; status?: any; note?: string | null }) => ({
-              student: response.student,
-              status: mapStatus(response.status),
-              note: response.note ?? null,
-            }));
+            .map(
+              (response: {
+                student: Student;
+                status?: any;
+                note?: string | null;
+              }) => ({
+                student: response.student,
+                status: mapStatus(response.status),
+                note: response.note ?? null,
+              })
+            );
           setStudents(initialStudents);
+
+          // Lưu các note vào lateReasons state
+          const notesMap: Record<number, string> = {};
+          studentData.students.forEach((response: any) => {
+            if (response?.student && response?.note) {
+              notesMap[response.student.id] = response.note;
+            }
+          });
+          setLateReasons(notesMap);
         } else {
           setStudents([]);
         }
@@ -99,12 +254,6 @@ export default function ClassDetailScreen() {
 
     fetchData();
   }, [scheduleId]);
-
-  const updateStatus = (id: number, newStatus: StudentAttendance["status"]) => {
-    setStudents((prev) =>
-      prev.map((s) => (s.student.id === id ? { ...s, status: newStatus } : s))
-    );
-  };
 
   const countByStatus = (status: StudentAttendance["status"]) =>
     students.filter((s) => s.status === status).length;
@@ -138,7 +287,9 @@ export default function ClassDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.replace('/(tabs)/CalendarScreen')}>
+      <TouchableOpacity
+        onPress={() => router.replace("/(tabs)/CalendarScreen")}
+      >
         <Text style={styles.back}>← Quay lại</Text>
       </TouchableOpacity>
 
@@ -185,9 +336,22 @@ export default function ClassDetailScreen() {
           <Ionicons name="camera" size={18} color="#fff" />
           <Text style={styles.buttonText}> Xác thực khuôn mặt</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.buttonSecondary}>
-          <Ionicons name="checkbox" size={18} color="#00796B" />
-          <Text style={styles.buttonSecondaryText}> Điểm danh tất cả</Text>
+        <TouchableOpacity
+          style={[
+            styles.buttonSecondary,
+            isMarkingAll && styles.buttonDisabled,
+          ]}
+          onPress={showMarkAllConfirmation}
+          disabled={isMarkingAll}
+        >
+          {isMarkingAll ? (
+            <ActivityIndicator size="small" color="#00796B" />
+          ) : (
+            <Ionicons name="checkbox" size={18} color="#00796B" />
+          )}
+          <Text style={styles.buttonSecondaryText}>
+            {isMarkingAll ? " Đang xử lý..." : " Điểm danh tất cả"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -227,9 +391,16 @@ export default function ClassDetailScreen() {
                     "Vắng mặt"
                   )}
                 </View>
-                {lateReasons[item.student.id] && (
-                  <Text style={{ color: '#F9A825', fontSize: 12, marginTop: 2 }}>
-                    Lý do đi muộn: {lateReasons[item.student.id]}
+                {(item.note || lateReasons[item.student.id]) && (
+                  <Text
+                    style={{ color: "#F9A825", fontSize: 12, marginTop: 2 }}
+                  >
+                    Lý do đi muộn:{" "}
+                    {item.note
+                      ? item.note
+                      : lateReasons[item.student.id]
+                      ? lateReasons[item.student.id]
+                      : "Không có"}
                   </Text>
                 )}
               </View>
@@ -301,18 +472,7 @@ export default function ClassDetailScreen() {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButton}
-                onPress={() => {
-                  if (lateReasonStudentId !== null) {
-                    setLateReasons((prev) => ({
-                      ...prev,
-                      [lateReasonStudentId]: lateReasonText,
-                    }));
-                    updateStatus(lateReasonStudentId, 2); // 2: Đi muộn
-                  }
-                  setLateReasonModalVisible(false);
-                  setLateReasonText("");
-                  setLateReasonStudentId(null);
-                }}
+                onPress={handleLateReasonSave}
               >
                 <Text style={styles.modalButtonText}>Lưu</Text>
               </TouchableOpacity>
@@ -324,7 +484,9 @@ export default function ClassDetailScreen() {
                   setLateReasonStudentId(null);
                 }}
               >
-                <Text style={[styles.modalButtonText, { color: '#C62828' }]}>Quay lại</Text>
+                <Text style={[styles.modalButtonText, { color: "#C62828" }]}>
+                  Quay lại
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -472,6 +634,9 @@ const styles = StyleSheet.create({
     color: "#00796B",
     fontWeight: "bold",
   },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
   sectionTitle: {
     marginVertical: 10,
     fontSize: 16,
@@ -502,20 +667,20 @@ const styles = StyleSheet.create({
   tagText: { fontSize: 12 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
-    width: '85%',
-    backgroundColor: '#fff',
+    width: "85%",
+    backgroundColor: "#fff",
     borderRadius: 10,
     padding: 20,
     elevation: 5,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
   },
   modalInputWrapper: {
@@ -528,28 +693,28 @@ const styles = StyleSheet.create({
   modalInput: {
     height: 80,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderRadius: 8,
     padding: 8,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   modalButton: {
     padding: 10,
-    backgroundColor: '#2E7D32',
+    backgroundColor: "#2E7D32",
     borderRadius: 6,
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: 5,
   },
   modalCancel: {
-    backgroundColor: '#eee',
+    backgroundColor: "#eee",
   },
   modalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: "#fff",
+    fontWeight: "bold",
   },
 });

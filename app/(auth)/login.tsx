@@ -24,12 +24,12 @@ export default function LoginScreen() {
         AsyncStorage.setItem("access_token", response.access_token);
         router.replace("/(tabs)");
       }
-      
     } catch (error: any) {
       if (error) {
         Toast.show({
           type: "error",
-          text1: error.response.data.message || "Đã có lỗi xảy ra",
+          text1:
+            error.response.data.message || error.message || "Đã có lỗi xảy ra",
         });
       }
     }
@@ -37,7 +37,11 @@ export default function LoginScreen() {
   return (
     <View style={styles.safeArea}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' || Platform.OS === 'android' ? "padding" : undefined}
+        behavior={
+          Platform.OS === "ios" || Platform.OS === "android"
+            ? "padding"
+            : undefined
+        }
         style={styles.container}
       >
         {/* Đã ép rộng 100% và padding ở đây */}
@@ -64,7 +68,10 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry
             />
-            <TouchableOpacity style={styles.button} onPress={()=>handleLogin()}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => handleLogin()}
+            >
               <Text style={styles.buttonText}>Đăng nhập</Text>
             </TouchableOpacity>
           </View>
@@ -78,28 +85,28 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#fff",
-    width: '100%', // Đảm bảo chiếm toàn bộ chiều rộng
+    width: "100%", // Đảm bảo chiếm toàn bộ chiều rộng
   },
   container: {
     flex: 1,
     justifyContent: "center",
-    width: '100%', // Đảm bảo chiếm toàn bộ chiều rộng
+    width: "100%", // Đảm bảo chiếm toàn bộ chiều rộng
   },
-  innerContainer: {     
-    width: "100%",      
-    paddingHorizontal: 20, 
+  innerContainer: {
+    width: "100%",
+    paddingHorizontal: 20,
   },
   containerImage: {
     alignItems: "center",
     marginBottom: 20,
   },
   image: {
-    width: "100%",  
+    width: "100%",
     height: 200,
   },
   form: {
     gap: 15,
-    width: "100%",  
+    width: "100%",
   },
   input: {
     borderWidth: 1,
