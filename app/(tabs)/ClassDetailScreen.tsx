@@ -1,6 +1,7 @@
 import FaceScanCamera from "@/components/FaceScanCamera";
 import { Schedule } from "@/models/Schedule";
 import { Student } from "@/models/Student";
+import { StudentAttendance } from "@/models/StudentAttendance";
 import { getScheduleById } from "@/service/schedule/schedule.api";
 import { getStudentByClass } from "@/service/student/student.api";
 import { FontAwesome, Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -14,16 +15,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
-
-// Student type now directly uses the Student model
-type StudentAttendance = {
-  student: Student;
-  status: "Đang học" | "late" | "vắng mặt";
-};
 
 export default function ClassDetailScreen() {
   const router = useRouter();
@@ -34,6 +30,10 @@ export default function ClassDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFaceScanCameraVisible, setIsFaceScanCameraVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [lateReasonModalVisible, setLateReasonModalVisible] = useState(false);
+  const [lateReasonText, setLateReasonText] = useState("");
+  const [lateReasonStudentId, setLateReasonStudentId] = useState<number | null>(null);
+  const [lateReasons, setLateReasons] = useState<Record<number, string>>({});
 
   const handleVerificationSuccess = (verifiedStudentId: number) => {
     Toast.show({
@@ -41,8 +41,13 @@ export default function ClassDetailScreen() {
       text1: "Xác thực thành công!",
       text2: `Đã điểm danh sinh viên.`,
     });
-    updateStatus(verifiedStudentId, "Đang học");
+    updateStatus(verifiedStudentId, 1); // 1: Có mặt
     setSelectedStudent(null);
+  };
+
+  const handleLateRadio = (studentId: number) => {
+    setLateReasonStudentId(studentId);
+    setLateReasonModalVisible(true);
   };
 
   useEffect(() => {
@@ -60,18 +65,28 @@ export default function ClassDetailScreen() {
 
         setScheduleInfo(scheduleData);
 
+        const mapStatus = (rawStatus: any): 1 | 2 | 3 => {
+          // Nếu backend trả số
+          if (rawStatus === 1) return 1; // Có mặt
+          if (rawStatus === 2) return 2; // Đi muộn
+          if (rawStatus === 3) return 3; // Vắng mặt
+          // Nếu backend trả string
+          if (rawStatus === "Đang học" || rawStatus === 0) return 1;
+          if (rawStatus === "Đi muộn") return 2;
+          if (rawStatus === "Vắng mặt") return 3;
+          // Mặc định
+          return 3;
+        };
+
         // Ensure studentData is an array and filter out invalid entries
         if (Array.isArray(studentData)) {
           const initialStudents: StudentAttendance[] = studentData
-            .filter((response: any) => {
-              return response?.student; // Check if student exists directly
-            })
-            .map((response: { student: Student; status?: string }) => {
-              return {
-                student: response.student,
-                status: 'vắng mặt',
-              };
-            });
+            .filter((response: any) => response?.student)
+            .map((response: { student: Student; status?: any; note?: string | null }) => ({
+              student: response.student,
+              status: mapStatus(response.status),
+              note: response.note ?? null,
+            }));
           setStudents(initialStudents);
         } else {
           setStudents([]);
@@ -123,7 +138,7 @@ export default function ClassDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()}>
+      <TouchableOpacity onPress={() => router.replace('/(tabs)/CalendarScreen')}>
         <Text style={styles.back}>← Quay lại</Text>
       </TouchableOpacity>
 
@@ -144,19 +159,19 @@ export default function ClassDetailScreen() {
         />
         <StatBox
           label="Có mặt"
-          value={countByStatus("Đang học")}
+          value={countByStatus(1)}
           color="#43A047"
           icon={<Ionicons name="checkmark-circle" size={24} color="#43A047" />}
         />
         <StatBox
           label="Đi muộn"
-          value={countByStatus("late")}
+          value={countByStatus(2)}
           color="#FBC02D"
           icon={<MaterialIcons name="access-time" size={24} color="#FBC02D" />}
         />
         <StatBox
           label="Vắng mặt"
-          value={countByStatus("vắng mặt")}
+          value={countByStatus(3)}
           color="#E53935"
           icon={<Ionicons name="close-circle" size={24} color="#E53935" />}
         />
@@ -183,11 +198,7 @@ export default function ClassDetailScreen() {
           item?.student?.id?.toString() ?? index.toString()
         }
         renderItem={({ item }) => {
-          // Skip rendering if student data is invalid
-          if (!item?.student) {
-            return null;
-          }
-
+          if (!item?.student) return null;
           return (
             <View style={styles.studentCard}>
               <View style={styles.info}>
@@ -196,26 +207,31 @@ export default function ClassDetailScreen() {
                 <View style={styles.radioRow}>
                   {renderRadio(
                     item.student.id,
-                    "Đang học",
+                    1,
                     item.status,
                     updateStatus,
                     "Có mặt"
                   )}
                   {renderRadio(
                     item.student.id,
-                    "late",
+                    2,
                     item.status,
-                    updateStatus,
+                    (id) => handleLateRadio(id),
                     "Đi muộn"
                   )}
                   {renderRadio(
                     item.student.id,
-                    "vắng mặt",
+                    3,
                     item.status,
                     updateStatus,
                     "Vắng mặt"
                   )}
                 </View>
+                {lateReasons[item.student.id] && (
+                  <Text style={{ color: '#F9A825', fontSize: 12, marginTop: 2 }}>
+                    Lý do đi muộn: {lateReasons[item.student.id]}
+                  </Text>
+                )}
               </View>
               <View style={styles.statusTag}>
                 <Text style={[styles.tagText, getStatusStyle(item.status)]}>
@@ -261,6 +277,58 @@ export default function ClassDetailScreen() {
             scheduleId={parseInt(scheduleId, 10)}
           />
         )}
+      </Modal>
+
+      <Modal
+        visible={lateReasonModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLateReasonModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Nhập lý do đi muộn</Text>
+            <View style={styles.modalInputWrapper}>
+              <Text style={styles.modalLabel}>Lý do:</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Nhập lý do tại đây..."
+                value={lateReasonText}
+                onChangeText={setLateReasonText}
+                multiline
+              />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  if (lateReasonStudentId !== null) {
+                    setLateReasons((prev) => ({
+                      ...prev,
+                      [lateReasonStudentId]: lateReasonText,
+                    }));
+                    updateStatus(lateReasonStudentId, 2); // 2: Đi muộn
+                  }
+                  setLateReasonModalVisible(false);
+                  setLateReasonText("");
+                  setLateReasonStudentId(null);
+                }}
+              >
+                <Text style={styles.modalButtonText}>Lưu</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancel]}
+                onPress={() => {
+                  setLateReasonModalVisible(false);
+                  setLateReasonText("");
+                  setLateReasonStudentId(null);
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: '#C62828' }]}>Quay lại</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -328,11 +396,11 @@ function renderRadio(
 
 function getStatusText(status: StudentAttendance["status"]) {
   switch (status) {
-    case "Đang học":
+    case 1:
       return "Có mặt";
-    case "late":
+    case 2:
       return "Đi muộn";
-    case "vắng mặt":
+    case 3:
       return "Vắng mặt";
   }
 }
@@ -346,11 +414,11 @@ function getStatusStyle(status: StudentAttendance["status"]) {
   };
 
   switch (status) {
-    case "Đang học":
+    case 1:
       return { ...common, backgroundColor: "#F1F8E9", color: "#2E7D32" };
-    case "late":
+    case 2:
       return { ...common, backgroundColor: "#FFF9C4", color: "#F9A825" };
-    case "vắng mặt":
+    case 3:
       return { ...common, backgroundColor: "#FFEBEE", color: "#C62828" };
   }
 }
@@ -432,4 +500,56 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   tagText: { fontSize: 12 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  modalInputWrapper: {
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  modalInput: {
+    height: 80,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 8,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    padding: 10,
+    backgroundColor: '#2E7D32',
+    borderRadius: 6,
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  modalCancel: {
+    backgroundColor: '#eee',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 });

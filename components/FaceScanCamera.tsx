@@ -76,11 +76,16 @@ export default function FaceScanCamera({
         token
       );
 
-      if (result) {
+      if (result && result.data && result.data.success) {
         onVerificationSuccess(studentId);
         onClose(); // Close camera on success
+      } else if (result && result.data && result.data.message) {
+        Toast.show({
+          type: 'error',
+          text1: result.data.message,
+        });
+        setIsScanning(false);
       } else {
-        // Error toast is shown by the API service, just reset scanning state
         setIsScanning(false);
       }
     } catch (error: any) {

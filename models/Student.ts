@@ -12,7 +12,7 @@ export interface Student {
     permanentResidence: string | null;
     avatar: string | null;
     cardId: string | null;
-    status: 'Đang học' | 'Đã tốt nghiệp' | null | string;
+    status: string;
     total_retake_attempts: number;
     userId: number | null;
   }

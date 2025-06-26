@@ -1,4 +1,4 @@
-export interface ClassData {
+export interface Class {
     id: number;
     createdAt: string;
     updatedAt: string;
