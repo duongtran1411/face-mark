@@ -1,26 +1,26 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import { View, StyleSheet, SafeAreaView, Image } from 'react-native';
 
-const headerBackgroundColor = '#297339'; 
+const headerBackgroundColor = '#297339';
 
 export default function CustomHeader() {
   return (
     <View style={{ backgroundColor: headerBackgroundColor }}>
       <SafeAreaView>
         <View style={styles.headerContainer}>
-          <TouchableOpacity style={styles.menuButton}>
-            <Text style={styles.menuIcon}>☰</Text>
-          </TouchableOpacity>
+          <View style={styles.spacer} />
 
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../assets/images/Demo 1.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
+          <View style={styles.logoWrapper}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../assets/images/Demo 1.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
           </View>
-          
-          <View style={{ width: 40 }} />
+
+          <View style={styles.spacer} /> 
         </View>
       </SafeAreaView>
     </View>
@@ -34,13 +34,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     height: 60,
+    position: 'relative',
   },
-  menuButton: {
-    padding: 5,
+  spacer: {
+    width: 40,
   },
-  menuIcon: {
-    color: 'white',
-    fontSize: 28,
+  logoWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   logoContainer: {
     backgroundColor: 'white',
@@ -59,4 +62,4 @@ const styles = StyleSheet.create({
     width: 150,
     height: 40,
   },
-}); 
+});
