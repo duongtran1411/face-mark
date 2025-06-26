@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Dimensions,
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -23,8 +23,6 @@ interface FaceScanCameraProps {
   scheduleId: number;
 }
 
-const { width, height } = Dimensions.get("window");
-
 export default function FaceScanCamera({
   onClose,
   onVerificationSuccess,
@@ -35,6 +33,7 @@ export default function FaceScanCamera({
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(false);
   const cameraRef = useRef<ExpoCameraView | null>(null);
+  const [lastImageDataUrl, setLastImageDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!permission) {
@@ -53,11 +52,11 @@ export default function FaceScanCamera({
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
+        quality: 1,
         base64: true,
         exif: false,
       });
-
+      console.log("IMAGE BASE64:", photo.base64?.slice(0, 100)); // In ra 100 ký tự đầu
       if (!photo?.base64) {
         Toast.show({ type: "error", text1: "Không thể lấy dữ liệu ảnh" });
         setIsScanning(false);
@@ -68,6 +67,8 @@ export default function FaceScanCamera({
       // For now, use JPEG as default format since expo-camera typically returns JPEG
       // If you need to support other formats, you can modify the takePictureAsync options
       const imageDataUrl = `data:image/jpeg;base64,${photo.base64}`;
+      console.log("IMAGE DATA URL:", imageDataUrl.slice(0, 400));
+      setLastImageDataUrl(imageDataUrl);
       const result = await FaceVerifyImage(
         studentId,
         scheduleId,
@@ -75,7 +76,6 @@ export default function FaceScanCamera({
         token
       );
 
-      console.log(result);
       if (result) {
         onVerificationSuccess(studentId);
         onClose(); // Close camera on success
@@ -114,7 +114,7 @@ export default function FaceScanCamera({
           <Ionicons name="close-outline" size={30} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerText}>Quét khuôn mặt</Text>
-        <View style={{ width: 40 }} />image.png
+        <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.scanArea}>
@@ -165,6 +165,16 @@ export default function FaceScanCamera({
           </Text>
         </TouchableOpacity>
       </View>
+
+      {lastImageDataUrl && (
+        <View style={{ alignItems: "center", marginTop: 20 }}>
+          <Text style={{ color: "white" }}>Ảnh vừa chụp:</Text>
+          <Image
+            source={{ uri: lastImageDataUrl }}
+            style={{ width: 200, height: 250, borderRadius: 10, marginTop: 10 }}
+          />
+        </View>
+      )}
     </View>
   );
 
@@ -200,9 +210,14 @@ export default function FaceScanCamera({
       );
     }
     return (
-      <CameraView ref={cameraRef} style={styles.container} facing="front">
+      <View style={styles.container}>
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing="front"
+        />
         {renderOverlay()}
-      </CameraView>
+      </View>
     );
   }
 
