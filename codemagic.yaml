@@ -18,7 +18,8 @@ workflows:
       - build/**/*
     publishing:
       app_store_connect:
-        apple_id: $APPLE_ID
-        api_key_id: $APP_STORE_CONNECT_API_KEY_ID
-        api_issuer_id: $APP_STORE_CONNECT_API_ISSUER_ID
+        authentication:
+          api_key: $APP_STORE_CONNECT_API_KEY  # ← chứa nội dung file .p8 base64
+          key_id: $APP_STORE_CONNECT_API_KEY_ID
+          issuer_id: $APP_STORE_CONNECT_API_ISSUER_ID
         submit_to_testflight: true
