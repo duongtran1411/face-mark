@@ -123,6 +123,8 @@ export default function CalendarScreen() {
                   <View style={styles.itemSeparator} />
                 )}
                 style={styles.classList}
+                contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={true}
               />
             </View>
           )}
@@ -179,6 +181,8 @@ export default function CalendarScreen() {
                 <View style={styles.itemSeparator} />
               )}
               style={styles.classList}
+              contentContainerStyle={{ paddingBottom: 100 }}
+              showsVerticalScrollIndicator={true}
             />
           </View>
         )}

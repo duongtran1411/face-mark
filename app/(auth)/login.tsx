@@ -58,15 +58,23 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Tên đăng nhập"
+              placeholderTextColor="#666"
               value={username}
               onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="username"
             />
             <TextInput
               style={styles.input}
               placeholder="Mật khẩu"
+              placeholderTextColor="#666"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="password"
             />
             <TouchableOpacity
               style={styles.button}

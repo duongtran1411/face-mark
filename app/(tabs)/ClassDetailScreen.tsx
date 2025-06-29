@@ -356,76 +356,81 @@ export default function ClassDetailScreen() {
       </View>
 
       <Text style={styles.sectionTitle}>Danh sách học sinh</Text>
-      <FlatList
-        data={students}
-        keyExtractor={(item, index) =>
-          item?.student?.id?.toString() ?? index.toString()
-        }
-        renderItem={({ item }) => {
-          if (!item?.student) return null;
-          return (
-            <View style={styles.studentCard}>
-              <View style={styles.info}>
-                <Text style={styles.name}>{item.student.name}</Text>
-                <Text style={styles.id}>MSSV: {item.student.studentId}</Text>
-                <View style={styles.radioRow}>
-                  {renderRadio(
-                    item.student.id,
-                    1,
-                    item.status,
-                    updateStatus,
-                    "Có mặt"
-                  )}
-                  {renderRadio(
-                    item.student.id,
-                    2,
-                    item.status,
-                    (id) => handleLateRadio(id),
-                    "Đi muộn"
-                  )}
-                  {renderRadio(
-                    item.student.id,
-                    3,
-                    item.status,
-                    updateStatus,
-                    "Vắng mặt"
+      <View style={styles.listContainer}>
+        <FlatList
+          data={students}
+          keyExtractor={(item, index) =>
+            item?.student?.id?.toString() ?? index.toString()
+          }
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={true}
+          renderItem={({ item }) => {
+            if (!item?.student) return null;
+            return (
+              <View style={styles.studentCard}>
+                <View style={styles.info}>
+                  <Text style={styles.name}>{item.student.name}</Text>
+                  <Text style={styles.id}>MSSV: {item.student.studentId}</Text>
+                  <View style={styles.radioRow}>
+                    {renderRadio(
+                      item.student.id,
+                      1,
+                      item.status,
+                      updateStatus,
+                      "Có mặt"
+                    )}
+                    {renderRadio(
+                      item.student.id,
+                      2,
+                      item.status,
+                      (id) => handleLateRadio(id),
+                      "Đi muộn"
+                    )}
+                    {renderRadio(
+                      item.student.id,
+                      3,
+                      item.status,
+                      updateStatus,
+                      "Vắng mặt"
+                    )}
+                  </View>
+                  {(item.note || lateReasons[item.student.id]) && (
+                    <Text
+                      style={{ color: "#F9A825", fontSize: 12, marginTop: 2 }}
+                    >
+                      Lý do đi muộn:{" "}
+                      {item.note
+                        ? item.note
+                        : lateReasons[item.student.id]
+                        ? lateReasons[item.student.id]
+                        : "Không có"}
+                    </Text>
                   )}
                 </View>
-                {(item.note || lateReasons[item.student.id]) && (
-                  <Text
-                    style={{ color: "#F9A825", fontSize: 12, marginTop: 2 }}
-                  >
-                    Lý do đi muộn:{" "}
-                    {item.note
-                      ? item.note
-                      : lateReasons[item.student.id]
-                      ? lateReasons[item.student.id]
-                      : "Không có"}
+                <View style={styles.statusTag}>
+                  <Text style={[styles.tagText, getStatusStyle(item.status)]}>
+                    {getStatusText(item.status)}
                   </Text>
-                )}
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSelectedStudent(item.student);
+                      setIsFaceScanCameraVisible(true);
+                    }}
+                  >
+                    <Ionicons
+                      name="camera"
+                      size={20}
+                      color="#777"
+                      style={{ marginTop: 4 }}
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.statusTag}>
-                <Text style={[styles.tagText, getStatusStyle(item.status)]}>
-                  {getStatusText(item.status)}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedStudent(item.student);
-                    setIsFaceScanCameraVisible(true);
-                  }}
-                >
-                  <Ionicons
-                    name="camera"
-                    size={20}
-                    color="#777"
-                    style={{ marginTop: 4 }}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        }}
-      />
+            );
+          }}
+        />
+      </View>
 
       <Modal
         visible={isFaceScanCameraVisible}
@@ -642,6 +647,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#1B5E20",
+    marginBottom: 8,
   },
   studentCard: {
     flexDirection: "row",
@@ -716,5 +722,8 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  listContainer: {
+    flex: 1,
   },
 });

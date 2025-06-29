@@ -1,11 +1,12 @@
 import { Teacher } from '@/models/Teacher';
 import { TokenPayload } from '@/models/TokenPaylod';
 import { getProfileTeacher } from '@/service/profile/teacher.api';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { jwtDecode } from 'jwt-decode';
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function ProfileScreen() {
   const [teacher,setTeacher] = useState<Teacher>();
@@ -30,7 +31,9 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.headerBox}>
-        <Image source={require('@/assets/images/user.png')} style={styles.avatar} />
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={60} color="#2E7D32" />
+        </View>
         <Text style={styles.title}>Thông tin giáo viên</Text>
       </View>
       {teacher ? (
@@ -100,9 +103,11 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: 16,
     alignSelf: 'center',
-    borderWidth: 2,
+    borderWidth: 4,
     borderColor: '#2E7D32',
     backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   label: {
     fontWeight: 'bold',
