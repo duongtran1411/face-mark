@@ -1,0 +1,25 @@
+workflows:
+  expo-ios:
+    name: Expo iOS Build and Upload to TestFlight
+    max_build_duration: 60
+    environment:
+      groups:
+        - FACEMARK  
+      vars:
+        EAS_BUILD_PROFILE: "production"
+      node: 16.20.0
+      xcode: latest
+    scripts:
+      - npm install -g expo-cli eas-cli
+      - npm install
+      - eas login --token $EXPO_TOKEN
+      - eas build --platform ios --profile $EAS_BUILD_PROFILE --non-interactive --no-wait
+    artifacts:
+      - build/**/*
+    publishing:
+      app_store_connect:
+        authentication:
+          api_key: $APP_STORE_CONNECT_API_KEY  # ← chứa nội dung file .p8 base64
+          key_id: $APP_STORE_CONNECT_API_KEY_ID
+          issuer_id: $APP_STORE_CONNECT_API_ISSUER_ID
+        submit_to_testflight: true
