@@ -1,8 +1,9 @@
-import { Shift } from './Shift';
+import { AttendanceStudent } from './AttendanceListReponse';
 import { ClassData } from './Classdata';
 import { Classroom } from './Classroom';
-import { Teacher } from './Teacher';
 import { Module } from './Module';
+import { Shift } from './Shift';
+import { Teacher } from './Teacher';
 
 export interface Schedule {
   id: number;
@@ -12,5 +13,17 @@ export interface Schedule {
   teacher: Teacher;
   date: string;
   module: Module;
+  dayOfWeek: string;
+}
+
+export interface ScheduleStudent {
+  id: number;
+  shift: Shift;
+  class: ClassData;
+  classroom: Classroom;
+  teacher: Teacher;
+  date: string;
+  module: Module;
+  attendances:AttendanceStudent[]
   dayOfWeek: string;
 }

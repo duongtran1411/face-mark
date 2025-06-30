@@ -1,5 +1,5 @@
 import { Teacher } from '@/models/Teacher';
-import { TokenPayload } from '@/models/TokenPaylod';
+import { TokenPayload } from '@/models/TokenPayload';
 import { getProfileTeacher } from '@/service/profile/teacher.api';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';

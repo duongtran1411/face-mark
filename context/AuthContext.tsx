@@ -1,5 +1,7 @@
+import { TokenPayload } from "@/models/TokenPayload";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { createContext, useContext, useEffect, useState } from "react";
 interface AuthContextType {
   isLoggedIn: boolean;
@@ -15,9 +17,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const loadToken = async () => {
     const token = await AsyncStorage.getItem("access_token");
     if (token) {
-      setUserToken(token);
-      setIsLoggedIn(true);
-      router.replace("/(tabs)");
+      const decoded = jwtDecode<TokenPayload>(token);
+      console.log('decoded',decoded);
+      if (Array.isArray(decoded.roles) && decoded.roles.includes("TEACHER")) {
+        
+        setUserToken(token);
+        setIsLoggedIn(true);
+        router.replace("/(tabs)")
+        return
+      }
+
+      if(decoded.roles.includes('STUDENT')){
+        setUserToken(token);
+        setIsLoggedIn(true);
+        router.replace("/(tabs)")
+        return
+      }
     } else {
       setUserToken(null);
       router.replace("/(auth)/login");
@@ -27,7 +42,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     loadToken();
   }, []);
-
 
   return (
     <AuthContext.Provider value={{ isLoggedIn }}>
@@ -41,4 +55,3 @@ export const useAuth = () => {
   if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 };
-

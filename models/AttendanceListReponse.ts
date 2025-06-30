@@ -9,3 +9,11 @@ export interface AttendanceListResponse {
     totalStudents: number;
     totalAttended: number;
   }
+
+  export interface AttendanceStudent{
+    id: number
+    status: number
+    note?:string
+    updatedAt:string
+    teacher: Teacher
+  }
