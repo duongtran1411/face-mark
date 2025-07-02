@@ -1,7 +1,7 @@
+import CustomHeader from '@/components/CustomHeader';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { View, Image } from 'react-native';
-import CustomHeader from '@/components/CustomHeader';
+import { Image, View } from 'react-native';
 
 const tabBackgroundColor = '#297339'; // Orange color from image
 const activeIconBackgroundColor = '#FFFFFF';
@@ -89,6 +89,12 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="ClassDetailScreen"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="CalendarStudentScreen"
         options={{
           href: null,
         }}

@@ -1,9 +1,11 @@
-import { Schedule } from "@/models/Schedule";
-import { getScheduleTeacher } from "@/service/schedule/schedule.api";
+import { ScheduleStudent } from "@/models/Schedule";
+import { TokenPayload } from "@/models/TokenPayload";
+import { AttendanceStudent } from "@/service/attendance/attendance.api";
 import { FontAwesome5 } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 import React, { useEffect, useState } from "react";
 import {
   FlatList,
@@ -14,20 +16,27 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 
-export default function CalendarScreen() {
+export default function CalendarStudentScreen() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<string>(
     dayjs().format("YYYY-MM-DD")
   );
-  const [schedule, setSchedule] = useState<Schedule[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleStudent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchSchedule = async () => {
       try {
         const token = await AsyncStorage.getItem("access_token");
-        const scheduleData = await getScheduleTeacher(selectedDate, token || "");
-        setSchedule(scheduleData || []); // Ensure schedule is always an array
+        if (token) {
+          const decoded = jwtDecode<TokenPayload>(token);
+          const scheduleData = await AttendanceStudent(
+            decoded.sub,
+            selectedDate,
+            token || ""
+          );
+          setSchedule(scheduleData || []); // Ensure schedule is always an array
+        }
       } catch (error) {
         setSchedule([]); // Reset on error
       } finally {
@@ -37,7 +46,33 @@ export default function CalendarScreen() {
     fetchSchedule();
   }, [selectedDate]);
 
-  const renderScheduleItem = ({ item }: { item: Schedule }) => (
+  const getStatusColor = (status: number) => {
+    switch (status) {
+      case 1:
+        return "#4CAF50"; // Xanh lá
+      case 2:
+        return "#FBC02D"; // Vàng
+      case 3:
+        return "#E53935"; // Đỏ
+      default:
+        return "#BDBDBD"; // Xám
+    }
+  };
+
+  const getStatusText = (status: number) => {
+    switch (status) {
+      case 1:
+        return "Đi học";
+      case 2:
+        return "Đi muộn";
+      case 3:
+        return "Vắng mặt";
+      default:
+        return "Không rõ";
+    }
+  };
+
+  const renderScheduleItem = ({ item }: { item: ScheduleStudent }) => (
     <View style={styles.classItemContainer}>
       {/* --- Timeline Column --- */}
       <View style={styles.timelineColumn}>
@@ -45,9 +80,13 @@ export default function CalendarScreen() {
           <Text style={styles.slotText}>Slot: {item.shift.id}</Text>
         </View>
         <View style={styles.timeline}>
-          <Text style={styles.timeText}>{item.shift.startTime.substring(0, 5)}</Text>
+          <Text style={styles.timeText}>
+            {item.shift.startTime.substring(0, 5)}
+          </Text>
           <View style={styles.timelineLine} />
-          <Text style={styles.timeText}>{item.shift.endTime.substring(0, 5)}</Text>
+          <Text style={styles.timeText}>
+            {item.shift.endTime.substring(0, 5)}
+          </Text>
         </View>
       </View>
 
@@ -59,16 +98,19 @@ export default function CalendarScreen() {
         <Text style={styles.infoText}>Lecturer: {item.teacher.name}</Text>
 
         <View style={styles.buttonsRow}>
-          <TouchableOpacity
-            style={[styles.button, styles.presentButton]}
-            onPress={() =>
-              router.push({
-                pathname: "/(tabs)/ClassDetailScreen",
-                params: { scheduleId: item.id.toString() },
-              })
-            }>
-            <Text style={styles.buttonText}>Điểm danh</Text>
-          </TouchableOpacity>
+          {item.attendances.map(att => (
+            <TouchableOpacity
+              key={att.id}
+              style={[
+                styles.button,
+                { backgroundColor: getStatusColor(att.status) }
+              ]}
+            >
+              <Text style={styles.buttonText}>
+                {getStatusText(att.status)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
     </View>
@@ -80,12 +122,16 @@ export default function CalendarScreen() {
         <Calendar
           onDayPress={(day) => setSelectedDate(day.dateString)}
           markedDates={{
-            [selectedDate]: { selected: true, marked: true, selectedColor: "#007BFF" },
+            [selectedDate]: {
+              selected: true,
+              marked: true,
+              selectedColor: "#007BFF",
+            },
           }}
           theme={{
             todayTextColor: "#007BFF",
             arrowColor: "#007BFF",
-            selectedDayTextColor: '#ffffff',
+            selectedDayTextColor: "#ffffff",
           }}
         />
 
@@ -138,12 +184,16 @@ export default function CalendarScreen() {
       <Calendar
         onDayPress={(day) => setSelectedDate(day.dateString)}
         markedDates={{
-          [selectedDate]: { selected: true, marked: true, selectedColor: "#007BFF" },
+          [selectedDate]: {
+            selected: true,
+            marked: true,
+            selectedColor: "#007BFF",
+          },
         }}
         theme={{
           todayTextColor: "#007BFF",
           arrowColor: "#007BFF",
-          selectedDayTextColor: '#ffffff',
+          selectedDayTextColor: "#ffffff",
         }}
       />
 
@@ -156,9 +206,7 @@ export default function CalendarScreen() {
               color="#ccc"
               style={{ opacity: 0.3 }}
             />
-            <Text style={styles.noClass}>
-              Không có lịch học trong ngày này
-            </Text>
+            <Text style={styles.noClass}>Không có lịch học trong ngày này</Text>
           </View>
         ) : (
           <View style={styles.dayContainer}>
@@ -196,7 +244,7 @@ const styles = StyleSheet.create({
   scheduleContainer: {
     flex: 1,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: "#E0E0E0",
     marginTop: 10,
   },
   dayContainer: {
@@ -232,25 +280,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   slotContainer: {
-    position: 'absolute',
+    position: "absolute",
     left: -25,
-    top:35,
-    transform: [{ rotate: '-90deg' }],
-    backgroundColor: '#F0F0F0',
+    top: 35,
+    transform: [{ rotate: "-90deg" }],
+    backgroundColor: "#F0F0F0",
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: "#E0E0E0",
   },
   slotText: {
     fontSize: 12,
     color: "#333",
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   timeline: {
     paddingTop: 8,
-    paddingLeft:20,
+    paddingLeft: 20,
     alignItems: "center",
   },
   timeText: {

@@ -65,3 +65,32 @@ export const markMultipleAttendance = async (
     throw error;
   }
 };
+
+
+export const AttendanceStudent = async (
+  userId: number,
+  date: string,
+  token: string
+) => {
+  try {
+    const response = await axiosInstance.get(
+      `schedules/student/${userId}/date/${date}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    if (error.response || axios.isAxiosError(error)) {
+      Toast.show({
+        type: "error",
+        text1: error.response.data.message || "Đã có lỗi xảy ra",
+      });
+    }
+    throw error;
+  }
+};
+
+
