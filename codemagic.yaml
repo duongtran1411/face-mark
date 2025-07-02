@@ -19,7 +19,7 @@ workflows:
     publishing:
       app_store_connect:
         authentication:
-          api_key: $APP_STORE_CONNECT_API_KEY  # ← chứa nội dung file .p8 base64
+          api_key: $APP_STORE_CONNECT_API_KEY 
           key_id: $APP_STORE_CONNECT_API_KEY_ID
           issuer_id: $APP_STORE_CONNECT_API_ISSUER_ID
         submit_to_testflight: true
