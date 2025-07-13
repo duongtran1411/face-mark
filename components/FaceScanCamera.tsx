@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 
+import { FaceVerificationResponse } from "@/models/FaceVerificationResponse";
 import { FaceVerifyImage } from "@/service/face-verify/face-verify.api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { CameraView as ExpoCameraView } from "expo-camera";
@@ -17,7 +18,10 @@ import Toast from "react-native-toast-message";
 
 interface FaceScanCameraProps {
   onClose: () => void;
-  onVerificationSuccess: (studentId: number) => void;
+  onVerificationSuccess: (
+    studentId: number,
+    verificationData?: FaceVerificationResponse
+  ) => void;
   studentName?: string;
   studentId: number;
   scheduleId: number;
@@ -34,12 +38,27 @@ export default function FaceScanCamera({
   const [isScanning, setIsScanning] = useState(false);
   const cameraRef = useRef<ExpoCameraView | null>(null);
   const [lastImageDataUrl, setLastImageDataUrl] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   useEffect(() => {
     if (!permission) {
       requestPermission();
     }
   }, [permission]);
+
+  const takePicture = async () => {
+    if (!cameraRef.current) return null;
+
+    return await cameraRef.current.takePictureAsync({
+      quality: 1,
+      base64: true,
+      exif: false,
+      skipProcessing: false,
+      // Không chỉ định imageType để camera tự chọn format tốt nhất
+      // Có thể là jpg, png, webp tùy theo thiết bị và camera
+    });
+  };
 
   const handleScan = async () => {
     if (isScanning || !cameraRef.current) return;
@@ -51,54 +70,100 @@ export default function FaceScanCamera({
     });
 
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 1,
-        base64: true,
-        exif: false,
-      });
-      console.log("IMAGE BASE64:", photo.base64?.slice(0, 100)); // In ra 100 ký tự đầu
+      const photo = await takePicture();
       if (!photo?.base64) {
         Toast.show({ type: "error", text1: "Không thể lấy dữ liệu ảnh" });
         setIsScanning(false);
         return;
       }
 
+      console.log("IMAGE BASE64:", photo.base64?.slice(0, 100));
+
       const token = (await AsyncStorage.getItem("access_token")) || "";
-      // For now, use JPEG as default format since expo-camera typically returns JPEG
-      // If you need to support other formats, you can modify the takePictureAsync options
-      const imageDataUrl = `data:image/jpeg;base64,${photo.base64}`;
+
+      // Tự động detect format từ base64 hoặc sử dụng JPEG làm default
+      let imageFormat = "jpeg";
+      if (photo.base64) {
+        // Kiểm tra magic bytes để detect format chính xác hơn
+        const firstBytes = photo.base64.substring(0, 12);
+        if (firstBytes.includes("iVBORw0KGgo")) {
+          imageFormat = "png";
+        } else if (firstBytes.includes("UklGR")) {
+          imageFormat = "webp";
+        } else if (firstBytes.includes("R0lGOD")) {
+          imageFormat = "gif";
+        } else if (firstBytes.includes("U2FtcGxl")) {
+          imageFormat = "bmp";
+        } else if (firstBytes.includes("SUkqAA")) {
+          imageFormat = "tiff";
+        }
+        // JPEG là default nếu không match format nào khác
+        // JPEG thường bắt đầu với /9j/4AAQSkZJRgABAQAAAQABAAD...
+      }
+
+      const imageDataUrl = `data:image/${imageFormat};base64,${photo.base64}`;
+      console.log("IMAGE FORMAT:", imageFormat);
+      console.log("BASE64 FIRST 20 CHARS:", photo.base64.substring(0, 20));
       console.log("IMAGE DATA URL:", imageDataUrl.slice(0, 400));
       setLastImageDataUrl(imageDataUrl);
+
+      // Gửi ảnh về API một lần duy nhất
       const result = await FaceVerifyImage(
         studentId,
         scheduleId,
         imageDataUrl,
         token
       );
+      console.log("RESULT:", result);
 
-      if (result && result.data && result.data.success) {
-        onVerificationSuccess(studentId);
-        onClose(); // Close camera on success
-      } else if (result && result.data && result.data.message) {
+      if (result && result.data && result.data.isMatch) {
         Toast.show({
-          type: 'error',
-          text1: result.data.message,
+          type: "success",
+          text1: result.message || "Xác thực khuôn mặt thành công",
+          text2: `Sinh viên: ${result.data.student.name} (${result.data.student.studentId})`,
+        });
+        onVerificationSuccess(studentId, result);
+        setIsScanning(false);
+        onClose();
+      } else if (result && result.data && !result.data.isMatch) {
+        const { confidence, traditionalSimilarity } = result.data;
+        Toast.show({
+          type: "error",
+          text1: result.message || "Xác thực khuôn mặt thất bại",
+          text2: `Độ tin cậy AI: ${(confidence * 100).toFixed(
+            1
+          )}% | Độ tương đồng truyền thống: ${(
+            traditionalSimilarity * 100
+          ).toFixed(1)}%`,
+        });
+        setIsScanning(false);
+        onClose();
+      } else if (result && result.message) {
+        Toast.show({
+          type: "error",
+          text1: result.message,
         });
         setIsScanning(false);
       } else {
+        Toast.show({ type: "error", text1: "Không thể xác thực khuôn mặt" });
         setIsScanning(false);
       }
     } catch (error: any) {
       console.error("Lỗi chụp ảnh hoặc xác thực:", error, error?.response);
 
-      // Nếu có response từ server
-      if (error && error.response && error.response.data && error.response.data.message) {
+      if (
+        error &&
+        error.response &&
+        error.response.data &&
+        error.response.data.message
+      ) {
         const errorMessage: string = error.response.data.message;
         if (errorMessage.includes("Không phát hiện được khuôn mặt")) {
           Toast.show({
             type: "error",
             text1: "Không phát hiện được khuôn mặt",
-            text2: "Hãy đảm bảo khuôn mặt rõ ràng, đủ ánh sáng và nhìn thẳng vào camera",
+            text2:
+              "Hãy đảm bảo khuôn mặt rõ ràng, đủ ánh sáng và nhìn thẳng vào camera",
           });
         } else {
           Toast.show({ type: "error", text1: errorMessage });
@@ -141,6 +206,14 @@ export default function FaceScanCamera({
           ]}
         >
           Đảm bảo khuôn mặt rõ ràng, đủ ánh sáng và nhìn thẳng vào camera
+        </Text>
+        <Text
+          style={[
+            styles.scanText,
+            { fontSize: 12, marginTop: 5, opacity: 0.7 },
+          ]}
+        >
+          Giữ khoảng cách 30-50cm, tránh bóng đổ trên mặt
         </Text>
         {Platform.OS === "web" && (
           <Text
@@ -185,7 +258,6 @@ export default function FaceScanCamera({
 
   if (Platform.OS !== "web") {
     if (!permission) {
-      // Đang loading thông tin quyền
       return (
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>
@@ -196,7 +268,6 @@ export default function FaceScanCamera({
     }
 
     if (!permission.granted) {
-      // Không có quyền
       return (
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>
@@ -226,7 +297,6 @@ export default function FaceScanCamera({
     );
   }
 
-  // Fallback for web
   return <View style={styles.container}>{renderOverlay()}</View>;
 }
 

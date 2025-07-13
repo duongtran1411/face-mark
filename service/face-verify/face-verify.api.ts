@@ -1,3 +1,4 @@
+import { FaceVerificationResponse } from "@/models/FaceVerificationResponse";
 import axios from "axios";
 import Toast from "react-native-toast-message";
 import axiosInstance from "../axios.service";
@@ -7,10 +8,10 @@ export const FaceVerifyImage = async (
   scheduleId: number,
   image: string,
   token: string
-) => {
+): Promise<FaceVerificationResponse | undefined> => {
   try {
-    const response = await axiosInstance.post(
-      "face-api/verify-face",
+    const response = await axiosInstance.post<FaceVerificationResponse>(
+      "/huggingface-face/verify-face-ai",
       {
         studentId,
         scheduleId,
@@ -30,5 +31,6 @@ export const FaceVerifyImage = async (
         text1: error.response.data.message || "Đã có lỗi xảy ra",
       });
     }
+    return undefined;
   }
 };

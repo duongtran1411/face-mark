@@ -1,4 +1,5 @@
 import FaceScanCamera from "@/components/FaceScanCamera";
+import { FaceVerificationResponse } from "@/models/FaceVerificationResponse";
 import { Schedule } from "@/models/Schedule";
 import { Student } from "@/models/Student";
 import { StudentAttendance } from "@/models/StudentAttendance";
@@ -43,12 +44,28 @@ export default function ClassDetailScreen() {
   const [lateReasons, setLateReasons] = useState<Record<number, string>>({});
   const [isMarkingAll, setIsMarkingAll] = useState(false);
 
-  const handleVerificationSuccess = (verifiedStudentId: number) => {
-    Toast.show({
-      type: "success",
-      text1: "Xác thực thành công!",
-      text2: `Đã điểm danh sinh viên.`,
-    });
+  const handleVerificationSuccess = (
+    verifiedStudentId: number,
+    verificationData?: FaceVerificationResponse
+  ) => {
+    // Show success message with detailed information if available
+    if (verificationData && verificationData.data) {
+      const { student, confidence, traditionalSimilarity } =
+        verificationData.data;
+      Toast.show({
+        type: "success",
+        text1: verificationData.message || "Xác thực thành công!",
+        text2: `Sinh viên: ${student.name} (${
+          student.studentId
+        }) - Độ tương đồng: ${(traditionalSimilarity * 100).toFixed(1)}%`,
+      });
+    } else {
+      Toast.show({
+        type: "success",
+        text1: "Xác thực thành công!",
+        text2: `Đã điểm danh sinh viên.`,
+      });
+    }
     updateStatus(verifiedStudentId, 1); // 1: Có mặt
     setSelectedStudent(null);
   };
@@ -204,7 +221,6 @@ export default function ClassDetailScreen() {
         ]);
 
         setScheduleInfo(scheduleData);
-        console.log("studentData", studentData.students);
         const mapStatus = (rawStatus: any): 1 | 2 | 3 => {
           // Nếu backend trả số
           if (rawStatus === 1) return 1; // Có mặt
@@ -395,18 +411,19 @@ export default function ClassDetailScreen() {
                       "Vắng mặt"
                     )}
                   </View>
-                  {(item.note || lateReasons[item.student.id]) && (
-                    <Text
-                      style={{ color: "#F9A825", fontSize: 12, marginTop: 2 }}
-                    >
-                      Lý do đi muộn:{" "}
-                      {item.note
-                        ? item.note
-                        : lateReasons[item.student.id]
-                        ? lateReasons[item.student.id]
-                        : "Không có"}
-                    </Text>
-                  )}
+                  {(item.note || lateReasons[item.student.id]) &&
+                    item.status === 2 && (
+                      <Text
+                        style={{ color: "#F9A825", fontSize: 12, marginTop: 2 }}
+                      >
+                        Lý do đi muộn:{" "}
+                        {item.note
+                          ? item.note
+                          : lateReasons[item.student.id]
+                          ? lateReasons[item.student.id]
+                          : "Không có"}
+                      </Text>
+                    )}
                 </View>
                 <View style={styles.statusTag}>
                   <Text style={[styles.tagText, getStatusStyle(item.status)]}>
